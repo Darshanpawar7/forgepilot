@@ -59,7 +59,7 @@ def caption_at(t, marks):
 
 def build_segments():
     ev = events()
-    total = duration(RAW)
+    total = max(offset + length for _, offset, length in sources())
     find = lambda pat, after=0: next(t for t, txt in ev if t >= after and re.search(pat, txt))
     t_a = find(r"^Task A selection") - 2
     t_b_start = find(r"after undo")  # end of the Task A block
@@ -88,17 +88,26 @@ def build_segments():
         cuts.append((a, b, True))
         cursor = b
     cuts.append((cursor, min(t_end, total), False))
+    # Short thinking stretches (under a minute, e.g. Task C's fallback) stay readable at 2x;
+    # only the long ones absorb the rest of the time budget.
+    SHORT, SHORT_SPEED = 60, 2.0
+    is_short = lambda a, b: b - a < SHORT
     normal = sum(b - a for a, b, f in cuts if not f)
-    fast_total = sum(b - a for a, b, f in cuts if f)
-    budget = TARGET_SECONDS - TITLE_SECONDS - normal
-    speed = max(2, min(MAX_FAST_SPEED, fast_total / max(budget, 1)))
+    short_total = sum(b - a for a, b, f in cuts if f and is_short(a, b))
+    long_total = sum(b - a for a, b, f in cuts if f and not is_short(a, b))
+    budget = TARGET_SECONDS - TITLE_SECONDS - normal - short_total / SHORT_SPEED
+    speed = max(2, min(MAX_FAST_SPEED, long_total / max(budget, 1)))
     normal_speed = 1.0
-    if budget < fast_total / MAX_FAST_SPEED:
-        # Even at max fast speed it does not fit: speed the real-time parts up a little too.
-        normal_speed = normal / (TARGET_SECONDS - TITLE_SECONDS - fast_total / MAX_FAST_SPEED)
+    if budget < long_total / MAX_FAST_SPEED:
+        normal_speed = normal / (TARGET_SECONDS - TITLE_SECONDS - short_total / SHORT_SPEED - long_total / MAX_FAST_SPEED)
         speed = MAX_FAST_SPEED
-    print(f"normal {normal:.0f}s at {normal_speed:.2f}x, fast {fast_total:.0f}s at {speed:.1f}x")
-    return [(a, b, speed if f else normal_speed, caption_at(a + 0.1, marks)) for a, b, f in cuts]
+    print(f"normal {normal:.0f}s at {normal_speed:.2f}x, short fast {short_total:.0f}s at 2x, long fast {long_total:.0f}s at {speed:.1f}x")
+
+    def pick(a, b, f):
+        if not f:
+            return normal_speed
+        return SHORT_SPEED if is_short(a, b) else speed
+    return [(a, b, pick(a, b, f), caption_at(a + 0.1, marks)) for a, b, f in cuts]
 
 
 def render_title(path):
@@ -106,7 +115,7 @@ def render_title(path):
         (FONT_BOLD, 78, "ForgePilot", -170),
         (FONT, 40, "An editor-native coding agent whose agent loop runs on TrueForge", -60),
         (FONT, 32, "VS Code extension \u00b7 TrueForge local mode \u00b7 editor tools over MCP \u00b7 tool approval drives the diff review", 10),
-        (FONT, 32, "Tasks A, B and C on pallets/flask 3.1.3 \u00b7 one continuous take \u00b7 review clicks scripted", 70),
+        (FONT, 32, "Tasks A, B and C on pallets/flask 3.1.3 \u00b7 live model calls on the free Gemini tier \u00b7 review clicks scripted", 70),
         (FONT, 30, "Team FLOWSTATE \u00b7 TM-E8DADAC3DAF \u00b7 Darshan P Pawar", 170),
     ]
     draws = ",".join(
@@ -133,13 +142,33 @@ def render_cut(i, a, b, speed, caption):
     return out
 
 
+def sources():
+    """The main recording, plus an optional continuation (raw file, start file) given as extra arguments."""
+    out = [(RAW, 0.0, duration(RAW))]
+    if len(sys.argv) > 6:
+        extra, extra_start = Path(sys.argv[5]), Path(sys.argv[6])
+        offset = (secs(extra_start.read_text().strip()) - secs(START.read_text().strip())).total_seconds()
+        out.append((extra, offset, duration(extra)))
+    return out
+
+
 def main():
+    global RAW
     segs = build_segments()
     parts = [WORK / "title.mp4"]
     render_title(parts[0])
-    for i, (a, b, speed, caption) in enumerate(segs):
-        print(f"cut {i}: {a:.1f}-{b:.1f}s x{speed:.2f} | {caption[:60]}")
-        parts.append(render_cut(i, a, b, speed, caption))
+    n = 0
+    main_raw = RAW
+    for a, b, speed, caption in segs:
+        for src, offset, length in sources():
+            lo, hi = max(a, offset), min(b, offset + length)
+            if hi - lo < 0.5:
+                continue
+            RAW = src
+            print(f"cut {n}: {src.name} {lo - offset:.1f}-{hi - offset:.1f}s x{speed:.2f} | {caption[:60]}")
+            parts.append(render_cut(n, lo - offset, hi - offset, speed, caption))
+            n += 1
+        RAW = main_raw
     lst = WORK / "list.txt"
     lst.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in parts))
     run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(OUT)])

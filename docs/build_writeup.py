@@ -88,9 +88,13 @@ def build():
             p = doc.add_paragraph(style="List Bullet 2" if level else "List Bullet"); tight(p, 0, 1)
             add_inline(p, line.strip()[2:])
         elif re.match(r"^\s*\d+\. ", line):
+            # Numbered items keep their own number, so each list restarts at 1 (Word's list style would continue).
             level = (len(line) - len(line.lstrip())) // 3
-            p = doc.add_paragraph(style="List Number 2" if level else "List Number"); tight(p, 0, 1)
-            add_inline(p, re.sub(r"^\s*\d+\.\s", "", line))
+            p = doc.add_paragraph(); tight(p, 0, 1)
+            p.paragraph_format.left_indent = Cm(0.9 + 0.6 * level)
+            p.paragraph_format.first_line_indent = Cm(-0.5)
+            num, rest = re.match(r"^\s*(\d+\.)\s(.*)", line).groups()
+            add_inline(p, f"{num} {rest}")
         elif line.strip():
             p = doc.add_paragraph(); tight(p, 0, 3)
             add_inline(p, line.strip())

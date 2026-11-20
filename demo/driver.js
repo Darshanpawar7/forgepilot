@@ -9,8 +9,8 @@ const cp = require("child_process");
 const LOG = process.env.FORGEPILOT_DEMO_LOG || path.join(__dirname, "demo-log.txt");
 const PY = process.env.FORGEPILOT_DEMO_PY || "C:/Users/darsh/oss-work/forge-a-thon/.venv-flask/Scripts";
 const APP = process.env.FORGEPILOT_DEMO_APP || "C:/Users/darsh/oss-work/demo_app.py";
-const PRIMARY = ["google-gemini/gemini-3-6-flash", "google-gemini/gemini-3-5-flash-lite"];
-const BROKEN_FIRST = ["openai/gpt-5-4-mini", "google-gemini/gemini-3-6-flash"];
+const PRIMARY = ["google-gemini/gemini-3-5-flash-lite", "google-gemini/gemini-3-1-flash-lite"];
+const BROKEN_FIRST = ["openai/gpt-5-4-mini", "google-gemini/gemini-3-5-flash-lite"];
 const TASK_A = "Treat the values 'off' and 'n' as false as well, case-insensitively, and update the docstring to list every value that is treated as false.";
 const TASK_B = "Add a new built-in CLI command flask config that prints the loaded application's configuration as JSON, masking the values of any key containing SECRET, PASSWORD, TOKEN or KEY as \"***\". It must appear in flask --help, be covered by a test, and be documented alongside the other built-in commands.";
 

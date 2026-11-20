@@ -40,22 +40,22 @@ Every request first gets a **context pack** with a fixed budget (24,000 characte
 Flask 3.1.3 (about 17,000 lines across src and tests) never enters the window whole. In Task B the panel shows the keywords, the files chosen with their scores, and then the agent's own searches.
 
 ## 5. Model setup
-- **Primary:** `google-gemini/gemini-3-6-flash`. **Fallback:** `google-gemini/gemini-3-5-flash-lite`. Both are configured in TrueForge as the Google Gemini catalog provider and use Google AI Studio's free tier, so the approximate cost is **₹0**.
+- **Primary:** `google-gemini/gemini-3-5-flash-lite`. **Fallback:** `google-gemini/gemini-3-1-flash-lite` (the models in the recorded run). Both are configured in TrueForge as the Google Gemini catalog provider and use Google AI Studio's free tier, so the approximate cost is **₹0**.
 - **Task C:** the first model in the list is `openai/gpt-5-4-mini`, configured in TrueForge with an **invalid API key**.
 - **Fallback:** ForgePilot tries the models in `forgepilot.models` in order. On a `turn.done` with status `error` (for example "Request failed (401): Invalid API Key"), it starts the same request on the next model automatically and tells the user. The workspace is untouched, because nothing is written without approval.
-- **Retry before fallback:** temporary provider errors (429/5xx, "high demand", timeouts) are retried up to twice on the same model, 5 seconds apart; a hard error such as a bad key falls back straight away. While we rehearsed, the free Gemini tier really did return 503 "high demand" and 429 rate limits, and the retry and fallback path recovered from them.
+- **Retry before fallback:** temporary provider errors (429/5xx, "high demand", timeouts) are retried on the same model before falling back (the current code allows 3 attempts, 5 seconds apart); a hard error such as a bad key falls back straight away. While we rehearsed, the free Gemini tier really did return 503 "high demand" and 429 rate limits, and the retry and fallback path recovered from them.
 - **To switch models,** add a provider in the TrueForge UI and edit `forgepilot.models` in the workspace settings (see `forgepilot.example.json`). No keys are stored in the repository.
 
 ## 6. Scorecard
 | Criterion | Video | Claim |
 | --- | --- | --- |
-| A1 Inline edit | TBD | Ctrl+Alt+K on the selection. The diff renders in the editor with a per-hunk accept/reject list |
-| A2 Agent mode | TBD | One panel request. The agent finds and edits the CLI module, the tests and the docs unprompted |
-| A3 Streaming and cancellation | TBD | Tokens stream into the panel. Cancel stops the TrueForge session, and nothing is half-applied |
-| B1 Context assembly | TBD | Budgeted pack: keywords, ranked files with scores and reasons, then the agent's own searches, all visible in the panel |
-| B2 Diff safety | TBD | Per-hunk review before any write; "Undo Last Applied Change" reverts the applied edit on screen |
-| B3 Resilience | TBD | The invalid-key model fails, the fallback to Gemini happens automatically, and `git status` is clean |
-| B4 TrueForge depth | TBD | Editor actions are MCP tools, and TrueForge's tool approval drives the diff review. Compaction and dynamic sub-agents are enabled; the session is shown in the TrueForge UI |
+| A1 Inline edit | 0:06-0:30 | Inline edit on the selected function (command "ForgePilot: Inline Edit", Ctrl+Alt+K). The diff opens in the editor; `FLASK_DEBUG=off` then prints False in the terminal (0:21) |
+| A2 Agent mode | 0:33-3:03 | One panel request, no files named. The agent finds `src/flask/cli.py`, adds and registers the command, adds a test, and runs the tests itself; verified on screen with pytest, `flask config` (masked JSON) and `flask --help` (2:39-3:03). In this recorded run the agent did not update `docs/cli.rst` (see section 8) |
+| A3 Streaming and cancellation | 0:33-1:39 | Tokens and tool calls stream into the panel. Cancel (`sessions.cancel` plus killing commands) is implemented but not shown in the video |
+| B1 Context assembly | 0:33 | Budgeted pack: keywords, ranked files with scores and reasons, then the agent's own searches, all listed in the panel |
+| B2 Diff safety | 0:12-0:27, 2:09 | Per-hunk review before any write (hunk checklist at 2:09); "Undo Last Applied Change" reverts Task A's edit (0:27) |
+| B3 Resilience | 3:15-3:45 | `openai/gpt-5-4-mini` with an invalid key fails (401), ForgePilot falls back to Gemini automatically, the change is rejected, and `git status` is clean |
+| B4 TrueForge depth | 3:06-3:12 | Editor actions are MCP tools and TrueForge's tool approval drives the diff review; compaction and dynamic sub-agents are on; the TrueForge UI is shown at 3:06 |
 
 ## 7. Tools used
 VS Code Extension API, the TrueForge SDK and server, the MCP TypeScript SDK, jsdiff, and ffmpeg (screen recording). Claude Code (Anthropic) was used as an AI coding assistant while building the extension.
@@ -65,5 +65,6 @@ VS Code Extension API, the TrueForge SDK and server, the MCP TypeScript SDK, jsd
 - Hunk review uses VS Code's diff editor plus a hunk checklist. We would add inline CodeLens accept/reject on each hunk.
 - Undo works per applied change. We would add checkpoints per agent run, so a whole run can be reverted at once.
 - Inline edit runs as a short agent session. We would add a lighter one-shot path for very small edits.
-- The demo was recorded in one continuous take with the review clicks scripted (`demo/driver.js`), to fit the 4-minute limit; the same review UI is used interactively. The stretches where the model is thinking are sped up, and the video labels them on screen.
-- Gemini Flash-Lite answers in about 10 seconds per step, so Task B takes several minutes in real time. A faster or self-hosted model behind TrueForge would cut this without code changes.
+- The demo run is scripted (`demo/driver.js`): it runs the same commands and accepts or rejects hunks in the same review UI a user would, to fit the 4-minute limit. It is one continuous take; the stretches where the model is thinking are sped up 2.4x and labelled on screen.
+- In the recorded run the Flash-Lite model skipped the documentation part of Task B and left two stray comment lines and a print in its test, which the scripted review accepted. After recording we tightened the agent instructions (check every requirement before finishing; put tests and docs next to their siblings); in a later rehearsal the agent then updated the code, `tests/test_cli.py` and `docs/cli.rst`, but that rehearsal's recording was not usable. A stronger model and a real human reviewer would catch both.
+- Gemini Flash-Lite answers in about 10 seconds per step on the free tier, which was also returning 503 "high demand" during recording, so Task B takes several minutes in real time. A faster or self-hosted model behind TrueForge would cut this without code changes.
