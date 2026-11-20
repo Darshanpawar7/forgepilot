@@ -41,7 +41,7 @@ for n, v in enumerate(voices):
     end = v["at"] + v["speech_s"] + 0.4
     draws.append(
         f"drawtext=fontfile='{FONT}':textfile='{sub.as_posix().replace(':', chr(92) + ':')}':fontsize=30:fontcolor=white:"
-        f"line_spacing=8:box=1:boxcolor=0x0b1220@0.72:boxborderw=14:x=(w-text_w)/2:y=1032-text_h-34:"
+        f"line_spacing=0:box=1:boxcolor=0x0b1220@0.78:boxborderw=16:x=(w-text_w)/2:y=1032-text_h-34:"
         f"enable='between(t,{v['at']:.2f},{end:.2f})'")
 
 graph = ";".join(chains)
