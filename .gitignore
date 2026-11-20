@@ -14,3 +14,5 @@ demo/*.txt
 demo/*.log
 docs/writeup.docx
 __pycache__/
+demo/voice/
+demo/*.wav

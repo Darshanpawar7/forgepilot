@@ -58,7 +58,7 @@ Flask 3.1.3 (about 17,000 lines across src and tests) never enters the window wh
 | B4 TrueForge depth | 3:06-3:12 | Editor actions are MCP tools and TrueForge's tool approval drives the diff review; compaction and dynamic sub-agents are on; the TrueForge UI is shown at 3:06 |
 
 ## 7. Tools used
-VS Code Extension API, the TrueForge SDK and server, the MCP TypeScript SDK, jsdiff, and ffmpeg (screen recording). Claude Code (Anthropic) was used as an AI coding assistant while building the extension.
+VS Code Extension API, the TrueForge SDK and server, the MCP TypeScript SDK, jsdiff, ffmpeg (screen recording and editing), and Indic Parler-TTS (AI4Bharat, Apache-2.0) run locally for the video narration, which is a synthetic voice. Claude Code (Anthropic) was used as an AI coding assistant while building the extension.
 
 ## 8. Known limitations and what we would do with another month
 - Retrieval is lexical. We would add an embedding index, and use language-server symbols for `@symbol` instead of a regular-expression scan.

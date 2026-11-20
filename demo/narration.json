@@ -1,0 +1,97 @@
+{
+ "voice": "Mary speaks in a warm, clear and confident way, like a friendly product demo presenter, at a moderate pace with a natural rhythm. The recording is of very high quality, with the voice sounding clear and very close up.",
+ "lines": [
+  {
+   "id": "n01",
+   "at": 0.4,
+   "window": 5.6,
+   "text": "This is ForgePilot: a coding agent in VS Code, whose agent loop runs on TrueForge."
+  },
+  {
+   "id": "n02",
+   "at": 6.3,
+   "window": 6.0,
+   "text": "Task A. We select a function and ask for an inline edit."
+  },
+  {
+   "id": "n03",
+   "at": 12.5,
+   "window": 8.3,
+   "text": "TrueForge pauses the edit for approval, and it opens as a diff. Nothing is written until it is accepted."
+  },
+  {
+   "id": "n04",
+   "at": 21.0,
+   "window": 11.5,
+   "text": "In the terminal, debug set to off now reads as false. Then a single command undoes the change."
+  },
+  {
+   "id": "n05",
+   "at": 33.0,
+   "window": 9.5,
+   "text": "Task B. One request in agent mode, with no files named: add a flask config command that masks secrets."
+  },
+  {
+   "id": "n06",
+   "at": 43.5,
+   "window": 11.0,
+   "text": "First, ForgePilot builds a context pack within a fixed budget: keywords, ranked files, and the reason each was chosen."
+  },
+  {
+   "id": "n07",
+   "at": 56.0,
+   "window": 11.0,
+   "text": "From there, the agent explores on its own, through search and read tools that the extension serves over MCP."
+  },
+  {
+   "id": "n08",
+   "at": 69.0,
+   "window": 10.0,
+   "text": "When the model is busy or rate limited, ForgePilot retries, and then falls back to the next model."
+  },
+  {
+   "id": "n09",
+   "at": 101.0,
+   "window": 10.0,
+   "text": "Every edit arrives as a TrueForge tool approval, and is reviewed hunk by hunk in the diff editor."
+  },
+  {
+   "id": "n10",
+   "at": 128.0,
+   "window": 11.5,
+   "text": "It registers the command, writes a test and runs it, until the free tier's rate limit ends the run."
+  },
+  {
+   "id": "n11",
+   "at": 158.5,
+   "window": 9.5,
+   "text": "Now we verify it. The command line tests pass, and flask config prints the settings as JSON."
+  },
+  {
+   "id": "n12",
+   "at": 169.0,
+   "window": 9.0,
+   "text": "Every secret, password, token and key is masked, and config appears in flask help.",
+   "say": "Every secret, password, token and key is masked, and the config command appears in flask help."
+  },
+  {
+   "id": "n13",
+   "at": 185.0,
+   "window": 8.0,
+   "text": "And here is the same session, inside the TrueForge interface."
+  },
+  {
+   "id": "n14",
+   "at": 194.5,
+   "window": 10.0,
+   "text": "Task C. The first model has an invalid API key. It fails, and ForgePilot falls back to Gemini automatically."
+  },
+  {
+   "id": "n15",
+   "at": 213.0,
+   "window": 14.0,
+   "text": "The change is rejected in review, so nothing is written, and git status stays clean. That's ForgePilot, from team FLOWSTATE.",
+   "say": "The change is rejected in review, so nothing is written, and git status stays clean. That's ForgePilot, from team Flow State."
+  }
+ ]
+}
