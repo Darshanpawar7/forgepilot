@@ -1,0 +1,7 @@
+{
+  "forgepilot.serverUrl": "http://localhost:8790",
+  "forgepilot.models": ["google-gemini/gemini-flash-latest", "openai/gpt-5-4-mini"],
+  "forgepilot.mcpPort": 8791,
+  "forgepilot.contextBudgetChars": 24000,
+  "forgepilot.commandPathPrepend": "/path/to/flask/.venv/Scripts"
+}

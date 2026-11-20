@@ -1,0 +1,91 @@
+{
+  "name": "forgepilot",
+  "displayName": "ForgePilot",
+  "description": "An editor-native coding agent whose agent loop runs on TrueForge (local mode): context assembly, multi-file agent mode, hunk-by-hunk diff review, streaming, cancellation and model fallback.",
+  "version": "0.1.0",
+  "publisher": "flowstate",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "forgepilot.inlineEdit",
+        "title": "ForgePilot: Inline Edit Selection"
+      },
+      {
+        "command": "forgepilot.openAgent",
+        "title": "ForgePilot: Open Agent Panel"
+      },
+      {
+        "command": "forgepilot.cancel",
+        "title": "ForgePilot: Cancel Run"
+      },
+      {
+        "command": "forgepilot.undoLast",
+        "title": "ForgePilot: Undo Last Applied Change"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "forgepilot.inlineEdit",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "forgepilot.cancel",
+        "key": "ctrl+alt+x",
+        "mac": "cmd+alt+x"
+      }
+    ],
+    "configuration": {
+      "title": "ForgePilot",
+      "properties": {
+        "forgepilot.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8790",
+          "description": "TrueForge server (local mode)."
+        },
+        "forgepilot.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "TrueForge model names in fallback order, e.g. [\"gemini/gemini-2.5-flash\", \"groq/llama-3.3-70b-versatile\"]. Empty = first two models TrueForge lists."
+        },
+        "forgepilot.mcpPort": {
+          "type": "number",
+          "default": 8791,
+          "description": "Port of the extension's MCP server (127.0.0.1 only, bearer-token protected)."
+        },
+        "forgepilot.contextBudgetChars": {
+          "type": "number",
+          "default": 24000,
+          "description": "Size budget for the automatically assembled context pack."
+        },
+        "forgepilot.commandPathPrepend": {
+          "type": "string",
+          "default": "",
+          "description": "Folder prepended to PATH for run_command, e.g. the Scripts/bin folder of the project's virtual environment."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@truefoundry/trueforge": "0.185.1",
+    "@truefoundry/trueforge-sdk": "0.185.0",
+    "diff": "9.0.0"
+  }
+}

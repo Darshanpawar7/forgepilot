@@ -1,0 +1,16 @@
+node_modules/
+.trueforge-data/
+.venv-flask/
+*.vsix
+.env
+.vscode-test/
+demo/demo-log.txt
+demo/trace.log
+demo/code-run.txt
+demo/autorun.flag
+*.mp4
+demo/cuts/
+demo/*.txt
+demo/*.log
+docs/writeup.docx
+__pycache__/

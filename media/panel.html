@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 10px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  header b { font-size: 1.1em; }
+  #status { opacity: .8; }
+  #log { flex: 1; overflow-y: auto; border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: 8px; white-space: pre-wrap; word-break: break-word; font-family: var(--vscode-editor-font-family); font-size: 12px; line-height: 1.45; }
+  .row { margin: 2px 0; }
+  .start { font-weight: bold; margin-top: 10px; color: var(--vscode-textLink-foreground); }
+  .context { color: var(--vscode-charts-purple); }
+  .call { color: var(--vscode-charts-blue); }
+  .result { opacity: .7; }
+  .review { color: var(--vscode-charts-orange); }
+  .apply { color: var(--vscode-charts-green); }
+  .error { color: var(--vscode-errorForeground); }
+  .cancelled { color: var(--vscode-charts-yellow); }
+  .done { color: var(--vscode-charts-green); font-weight: bold; }
+  .info { opacity: .85; }
+  .msg { margin: 4px 0 6px; padding: 6px; background: var(--vscode-textBlockQuote-background); border-radius: 3px; font-family: var(--vscode-font-family); font-size: 13px; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 70px; margin-top: 8px; font-family: var(--vscode-font-family); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px; }
+  .buttons { display: flex; gap: 8px; margin-top: 6px; }
+  button { padding: 6px 14px; border: none; border-radius: 2px; cursor: pointer; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+  button:disabled { opacity: .5; cursor: default; }
+  .hint { opacity: .7; font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <header><b>ForgePilot · agent mode on TrueForge</b><span id="status">idle</span></header>
+  <div id="log"></div>
+  <textarea id="input" placeholder="Describe the change. Use @path/to/file or @symbol to add context explicitly; the agent finds the rest itself."></textarea>
+  <div class="buttons">
+    <button id="run">Run agent</button>
+    <button id="cancel" class="secondary" disabled>Cancel</button>
+  </div>
+  <div class="hint">Every edit opens in the diff editor and waits for you to accept or reject it hunk by hunk. Ctrl+Enter runs.</div>
+<script>
+  const vscode = acquireVsCodeApi();
+  const log = document.getElementById("log");
+  const input = document.getElementById("input");
+  const runBtn = document.getElementById("run");
+  const cancelBtn = document.getElementById("cancel");
+  let msg = null;
+  const icons = { context: "◆ context", call: "→ tool", result: "  ←", review: "◎ review", apply: "✔ applied", error: "✖", cancelled: "■", done: "✔", info: "·" };
+  function add(cls, text) {
+    msg = null;
+    const d = document.createElement("div");
+    d.className = "row " + cls;
+    d.textContent = (icons[cls] ? icons[cls] + " " : "") + text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  function busy(on) { runBtn.disabled = on; cancelBtn.disabled = !on; }
+  runBtn.onclick = () => { vscode.postMessage({ type: "run", text: input.value }); };
+  cancelBtn.onclick = () => vscode.postMessage({ type: "cancel" });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.ctrlKey) runBtn.click(); });
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (m.type === "start") { add("start", m.text); busy(true); }
+    else if (m.type === "log") add(m.kind, m.text);
+    else if (m.type === "token") {
+      if (!msg) { msg = document.createElement("div"); msg.className = "msg"; log.appendChild(msg); }
+      msg.textContent += m.text; log.scrollTop = log.scrollHeight;
+    }
+    else if (m.type === "endMessage") msg = null;
+    else if (m.type === "status") document.getElementById("status").textContent = m.text;
+    else if (m.type === "finished") busy(false);
+    else if (m.type === "type") { input.value = m.text; }
+  });
+</script>
+</body>
+</html>
