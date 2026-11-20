@@ -40,10 +40,10 @@ Every request first gets a **context pack** with a fixed budget (24,000 characte
 Flask 3.1.3 (about 17,000 lines across src and tests) never enters the window whole. In Task B the panel shows the keywords, the files chosen with their scores, and then the agent's own searches.
 
 ## 5. Model setup
-- **Primary:** `google-gemini/gemini-3-5-flash-lite`. **Fallback:** `google-gemini/gemini-3-1-flash-lite`. Both are configured in TrueForge as the Google Gemini catalog provider and use Google AI Studio's free tier, so the approximate cost is **₹0**.
+- **Primary:** `google-gemini/gemini-3-6-flash`. **Fallback:** `google-gemini/gemini-3-5-flash-lite`. Both are configured in TrueForge as the Google Gemini catalog provider and use Google AI Studio's free tier, so the approximate cost is **₹0**.
 - **Task C:** the first model in the list is `openai/gpt-5-4-mini`, configured in TrueForge with an **invalid API key**.
 - **Fallback:** ForgePilot tries the models in `forgepilot.models` in order. On a `turn.done` with status `error` (for example "Request failed (401): Invalid API Key"), it starts the same request on the next model automatically and tells the user. The workspace is untouched, because nothing is written without approval.
-- **Retry before fallback:** temporary provider errors (429/5xx, "high demand", timeouts) are retried once on the same model after 3 seconds; a hard error such as a bad key falls back straight away. During recording, Gemini returned a real 503 "high demand" in Task A and the retry recovered it.
+- **Retry before fallback:** temporary provider errors (429/5xx, "high demand", timeouts) are retried up to twice on the same model, 5 seconds apart; a hard error such as a bad key falls back straight away. While we rehearsed, the free Gemini tier really did return 503 "high demand" and 429 rate limits, and the retry and fallback path recovered from them.
 - **To switch models,** add a provider in the TrueForge UI and edit `forgepilot.models` in the workspace settings (see `forgepilot.example.json`). No keys are stored in the repository.
 
 ## 6. Scorecard

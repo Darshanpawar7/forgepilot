@@ -17,8 +17,8 @@ const reviewUi = require("./review");
 
 // Provider overload and network blips are retried on the same model before falling back.
 const TRANSIENT_ERROR = /\b(429|500|502|503|504)\b|high demand|overloaded|timeout|timed out|ECONNRESET|Cannot connect/i;
-const MAX_ATTEMPTS_PER_MODEL = 2;
-const RETRY_DELAY_MS = 3000;
+const MAX_ATTEMPTS_PER_MODEL = 3;
+const RETRY_DELAY_MS = 5000;
 
 let tools, client, panel, status, extensionRoot;
 let run = null; // { sessionId, cancelled }
