@@ -64,11 +64,15 @@ def build_segments():
     t_a = find(r"^Task A selection") - 2
     t_b_start = find(r"after undo")  # end of the Task A block
     t_c = find(r"^Task C|MARK fast on", find(r"Task B in --help")) - 9
+    if any(txt.startswith("Cancel git status") for _, txt in ev):
+        t_c = max(t_c, find(r"^Cancel git status") + 4)  # keep the cancel caption while its git status shows
     t_end = find(r"DEMO COMPLETE") + 2
     marks = [
         (t_a, "Task A \u00b7 Inline edit on the selected function \u00b7 diff review \u00b7 verify in terminal \u00b7 undo"),
         (t_b_start, "Task B \u00b7 Agent mode: one request, no files named \u00b7 context pack \u2192 agent searches \u2192 reviewed edits"),
         (find(r"^Task B diff"), "Task B \u00b7 Verify: pytest, flask config (masked), flask --help, git diff \u00b7 TrueForge session UI"),
+        *([(find(r"^Cancel start") - 2, "Streaming and cancellation \u00b7 Cancel stops the TrueForge session mid-run \u00b7 nothing is half-applied")]
+          if any(txt == "Cancel start" for _, txt in ev) else []),
         (t_c, "Task C \u00b7 Resilience: first model has an invalid key \u2192 automatic fallback \u2192 change rejected \u2192 git status clean"),
     ]
     fast = []

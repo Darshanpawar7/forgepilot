@@ -9,12 +9,14 @@ const cp = require("child_process");
 const LOG = process.env.FORGEPILOT_DEMO_LOG || path.join(__dirname, "demo-log.txt");
 const PY = process.env.FORGEPILOT_DEMO_PY || "C:/Users/darsh/oss-work/forge-a-thon/.venv-flask/Scripts";
 const APP = process.env.FORGEPILOT_DEMO_APP || "C:/Users/darsh/oss-work/demo_app.py";
-const PRIMARY = ["google-gemini/gemini-3-5-flash-lite", "google-gemini/gemini-3-1-flash-lite"];
+const PRIMARY = ["google-gemini/gemini-3-6-flash", "google-gemini/gemini-3-5-flash-lite"];
 const BROKEN_FIRST = ["openai/gpt-5-4-mini", "google-gemini/gemini-3-5-flash-lite"];
 const TASK_A = "Treat the values 'off' and 'n' as false as well, case-insensitively, and update the docstring to list every value that is treated as false.";
 const TASK_B = "Add a new built-in CLI command flask config that prints the loaded application's configuration as JSON, masking the values of any key containing SECRET, PASSWORD, TOKEN or KEY as \"***\". It must appear in flask --help, be covered by a test, and be documented alongside the other built-in commands.";
 
-const ONLY = process.env.FORGEPILOT_DEMO_ONLY || "ABC";
+const ONLY = process.env.FORGEPILOT_DEMO_ONLY || "ABXC";
+const CANCEL_REQUEST = "Add return type hints to every function in src/flask/helpers.py that is missing one.";
+const CANCEL_AFTER_MS = 9000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => fs.appendFileSync(LOG, `[${new Date().toISOString().slice(11, 19)}] ${a.join(" ")}\n`);
 // VS Code reports "c:\\..."; Flask's path tests expect the usual upper-case drive letter.
@@ -104,6 +106,25 @@ async function run() {
     sh("git add -A"); sh('git commit -q -m "Task B: flask config command (ForgePilot)"');
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
 
+    }
+    // ---------------- Streaming and cancellation (A3) ----------------
+    if (ONLY.includes("X")) {
+    // Any edit proposed before the cancel is rejected, so the tree must stay clean either way.
+    await vscode.commands.executeCommand("forgepilot._demoPolicy", { action: "reject", delayMs: 1500 });
+    await vscode.commands.executeCommand("forgepilot.openAgent");
+    await vscode.commands.executeCommand("forgepilot._typeInPanel", CANCEL_REQUEST);
+    await sleep(1500);
+    log("Cancel start");
+    const running = vscode.commands.executeCommand("forgepilot.runAgent", CANCEL_REQUEST);
+    await sleep(CANCEL_AFTER_MS);
+    log("Cancel pressed");
+    await vscode.commands.executeCommand("forgepilot.cancel");
+    await running;
+    await sleep(2500);
+    show("git status --short; Write-Output '--- git status after Cancel (empty = nothing half-applied)'");
+    log("Cancel git status:", JSON.stringify(sh("git status --short")));
+    await sleep(4000);
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
     }
     // ---------------- Task C: resilience ----------------
     if (ONLY.includes("C")) {
