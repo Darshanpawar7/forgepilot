@@ -28,14 +28,14 @@ Built for the TrueFoundry Forge-a-thon (Techfest, IIT Bombay 2026-27) by team **
 ```
 VS Code extension (client)                         TrueForge (local mode, npx)
  ├─ panel / inline edit / diff review  ──SDK──►     sessions, streamed turns, approvals,
- ├─ context assembly (budgeted)                      compaction, dynamic sub-agents
+ ├─ context assembly (budgeted)                      compaction, sub-agents (enabled)
  └─ MCP server 127.0.0.1:8791 (bearer token) ◄──MCP── agent loop calls editor tools
       list_files, search_code, get_symbols, read_file,
       edit_file*, create_file*, run_command*      (* require approval: drive the diff review)
 ```
 
 - The extension never calls a model provider. The model is chosen in TrueForge, and ForgePilot only names it, in fallback order.
-- The agent definition is in [`agent/forgepilot.agent.json`](agent/forgepilot.agent.json). It contains the instructions and the MCP server with approval-gated tools, and it turns on TrueForge's context engineering: **compaction** and **dynamic sub-agents**.
+- The agent definition is in [`agent/forgepilot.agent.json`](agent/forgepilot.agent.json). It contains the instructions and the MCP server with approval-gated tools, and it enables TrueForge's **compaction** and **dynamic sub-agents** as safety margins for long runs (neither was triggered in the recorded demo runs).
 
 ## Setup from a clean clone
 

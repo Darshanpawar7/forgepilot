@@ -520,7 +520,7 @@ footer p { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
       <h2>Small surface, <em>deep integration.</em></h2>
     </div>
     <div class="stack reveal">
-      <div><b>TrueForge local mode</b><span>Runs the agent loop, sessions, tool approval, compaction and dynamic sub-agents. The extension never calls a model provider.</span></div>
+      <div><b>TrueForge local mode</b><span>Runs the agent loop, sessions and turns, and tool approval; it also switches models across the providers configured in it. The extension never calls a model provider itself.</span></div>
       <div><b>MCP server in the extension</b><span>Streamable HTTP on 127.0.0.1 with a random bearer token: list_files, search_code, get_symbols, read_file, edit_file, create_file, run_command.</span></div>
       <div><b>Diff review</b><span>VS Code's diff editor plus a hunk checklist (jsdiff). Partial accepts write only the ticked hunks.</span></div>
       <div><b>Back-off, resume, fallback</b><span>429s wait 20 / 40 / 60 s, overloads 5 / 10 / 20 s, then a new turn continues the same session. Hard errors fall back through forgepilot.models. No keys in the repository.</span></div>

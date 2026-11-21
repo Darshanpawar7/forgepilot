@@ -20,8 +20,7 @@ From scratch. No upstream coding assistant was forked. The editor side uses only
   4. The extension sends `user.tool_approval` allow, recording the accepted hunks, or deny with a reason the agent can act on.
   5. Only then does TrueForge call the MCP tool, which writes exactly the accepted hunks through a `WorkspaceEdit`. Nothing reaches disk without review, and an undo stack reverts any applied change.
 - **Harness features used:**
-  - **Compaction** (`contextManagement.compaction`) keeps long multi-file runs inside the window.
-  - **Dynamic sub-agents** (`dynamicSubAgents`) let the agent delegate a focused search.
+  - **Compaction** (`contextManagement.compaction`) and **dynamic sub-agents** (`dynamicSubAgents`) are enabled as safety margins for longer runs. In our recorded runs neither was triggered (no compaction or sub-agent thread events), so we do not count them as used.
   - **Preloaded MCP tools** (`preload`) make the workspace tools visible from the first step.
   - **Iteration limit:** a safety cap on the loop.
 - **Robust edit matching:** `old_string` is matched with normalised line endings, and the accepted text is written back in the file's own style (the Flask checkout uses CRLF on Windows). An inline edit ends its session as soon as its single reviewed change is written or rejected.
@@ -55,7 +54,7 @@ Flask 3.1.3 (about 17,000 lines across src and tests) never enters the window wh
 | B1 Context assembly | 0:33-0:45 | Budgeted pack (9,506 of 24,000 chars): keywords, ranked files and the reason each was chosen, then the agent's own searches, all listed in the panel |
 | B2 Diff safety | 0:12-0:27, 1:03-2:37 | Per-hunk review before every write (diff editor plus hunk checklist); one edit whose text did not match the file was refused automatically; "Undo Last Applied Change" reverts Task A's edit (0:27) |
 | B3 Resilience | 0:45-2:37, 3:33-3:49 | Task B: six real 429s; five back-offs, each followed by a new turn in the same session, and one fallback that keeps the accepted work. Task C: `openai/gpt-5-4-mini` with an invalid key fails (401), ForgePilot falls back to Gemini, the change is rejected, and `git status` is clean |
-| B4 TrueForge depth | 3:06-3:13 | Editor actions are MCP tools; TrueForge's tool approval drives the diff review; resumption uses new turns in the same session; compaction and dynamic sub-agents are on; the TrueForge UI is shown at 3:06 |
+| B4 TrueForge depth | 3:06-3:13 | Editor actions are MCP tools; TrueForge's tool approval drives the diff review; resumption uses new turns in the same session; cancellation uses `sessions.cancel`; the TrueForge UI is shown at 3:06 |
 
 ## 7. Tools used
 VS Code Extension API, the TrueForge SDK and server, the MCP TypeScript SDK, jsdiff, ffmpeg (screen recording and editing), and Indic Parler-TTS (AI4Bharat, Apache-2.0) run locally for the video narration, which is a synthetic voice. Claude Code (Anthropic) was used as an AI coding assistant while building the extension.
