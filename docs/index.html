@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgePilot · a coding agent that asks before it writes</title>
+<meta name="description" content="ForgePilot is a VS Code coding agent whose agent loop runs on TrueForge. Editor tools over MCP; TrueForge tool approval drives a hunk-by-hunk diff review. Team FLOWSTATE, TrueFoundry Forge-a-thon, Techfest IIT Bombay.">
+<meta property="og:title" content="ForgePilot · a coding agent that asks before it writes">
+<meta property="og:description" content="VS Code + TrueForge. Every edit passes a review gate before it touches disk.">
+<meta property="og:image" content="media/poster.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0c0f; --bg2: #101217; --panel: #151820; --panel2: #1b1f29; --line: #262b36; --line2: #323846;
+  --text: #ece6dc; --muted: #9b958b; --faint: #6c6860;
+  --amber: #ff8a1f; --amber2: #ffb35c; --ember: #ff5a47; --green: #3fd68f; --blue: #73a7ff; --violet: #b597ff;
+  --serif: "Fraunces", Georgia, serif; --sans: "Inter", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --r-s: 6px; --r-m: 12px; --r-l: 20px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body::before { /* film grain */
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: .055; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+a { color: inherit; }
+::selection { background: var(--amber); color: #120a02; }
+:focus-visible { outline: 2px solid var(--amber2); outline-offset: 3px; border-radius: 4px; }
+.wrap { width: min(1180px, 100% - 40px); margin: 0 auto; }
+.mono { font-family: var(--mono); }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--amber2); display: inline-flex; gap: 10px; align-items: center; }
+.eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -.02em; margin: 0; }
+h2 { font-size: clamp(34px, 5vw, 58px); line-height: 1.02; margin: 14px 0 18px; }
+h2 em, h1 em { font-style: italic; color: var(--amber2); font-weight: 400; }
+.lede { color: var(--muted); font-size: 18px; max-width: 640px; }
+section { padding: 120px 0 0; position: relative; }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+nav .wrap { display: flex; align-items: center; gap: 28px; height: 62px; }
+.logo { display: flex; align-items: center; gap: 10px; font: 700 17px/1 var(--serif); text-decoration: none; letter-spacing: -.01em; }
+.logo svg { width: 26px; height: 26px; }
+nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; color: var(--muted); }
+nav .links a { text-decoration: none; transition: color .2s; }
+nav .links a:hover { color: var(--text); }
+.btn { display: inline-flex; align-items: center; gap: 9px; padding: 11px 18px; border-radius: 999px; font: 600 14px/1 var(--sans); text-decoration: none; border: 1px solid var(--line2); background: var(--panel); color: var(--text); cursor: pointer; transition: transform .2s, background .2s, border-color .2s, box-shadow .2s; }
+.btn:hover { transform: translateY(-1px); border-color: var(--faint); }
+.btn:active { transform: translateY(0); }
+.btn.hot { background: linear-gradient(180deg, var(--amber2), var(--amber)); color: #1a0d00; border-color: transparent; box-shadow: 0 8px 30px -8px color-mix(in srgb, var(--amber) 70%, transparent); }
+.btn.hot:hover { box-shadow: 0 12px 38px -8px var(--amber); }
+nav .btn { padding: 9px 14px; }
+
+/* hero */
+.hero { padding: 84px 0 40px; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; width: 900px; height: 900px; right: -320px; top: -260px; background: radial-gradient(circle, color-mix(in srgb, var(--amber) 22%, transparent), transparent 62%); filter: blur(10px); pointer-events: none; }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; position: relative; z-index: 1; }
+.hero h1 { font-size: clamp(46px, 7.2vw, 96px); line-height: .95; letter-spacing: -.035em; font-weight: 800; margin: 22px 0 24px; }
+.hero h1 .thin { font-weight: 400; font-style: italic; color: var(--amber2); padding-right: .12em; }
+.hero p { font-size: 19px; color: var(--muted); max-width: 560px; margin: 0 0 30px; }
+.hero p b { color: var(--text); font-weight: 600; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.hero .stats { margin-top: 64px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 24px; border-top: 1px solid var(--line); }
+.stats div { padding: 20px 18px 0 0; }
+.stats b { display: block; font: 600 30px/1 var(--serif); letter-spacing: -.02em; }
+.stats span { color: var(--muted); font-size: 13px; }
+.stats b i { font-style: normal; color: var(--amber2); }
+
+/* hero diagram */
+.loop { position: relative; aspect-ratio: 1 / .92; }
+.loop svg { width: 100%; height: 100%; overflow: visible; }
+.node rect { fill: var(--panel); stroke: var(--line2); }
+.node text { font: 600 13px var(--sans); fill: var(--text); }
+.node .sub { font: 400 11px var(--mono); fill: var(--muted); }
+.wire { fill: none; stroke: var(--line2); stroke-width: 1.5; }
+.wire.hot { stroke: url(#heat); stroke-width: 2; }
+.gate-ring { fill: none; stroke: var(--amber); stroke-width: 2; transform-origin: center; transform-box: fill-box; animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: .35; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.05); } }
+.packet { filter: drop-shadow(0 0 6px currentColor); }
+.loop .caption { position: absolute; left: 0; right: 0; bottom: -6px; text-align: center; font: 12px var(--mono); color: var(--muted); }
+.loop .caption b { color: var(--amber2); font-weight: 600; }
+
+/* IDE replay */
+.replay-head { display: flex; justify-content: space-between; align-items: end; gap: 30px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 6px; padding: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; }
+.tabs button { border: 0; background: transparent; color: var(--muted); font: 600 13px var(--sans); padding: 9px 16px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.tabs button[aria-selected="true"] { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+.tabs button:hover { color: var(--text); }
+.ide { margin-top: 30px; border-radius: var(--r-l); border: 1px solid var(--line2); background: #0e1015; overflow: hidden; box-shadow: 0 40px 120px -40px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.02) inset; position: relative; }
+.ide::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; background: linear-gradient(140deg, color-mix(in srgb, var(--amber) 55%, transparent), transparent 35%, transparent 70%, color-mix(in srgb, var(--blue) 35%, transparent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.titlebar { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px; background: #12141a; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
+.dots { display: flex; gap: 7px; } .dots i { width: 11px; height: 11px; border-radius: 50%; background: #2a2e38; }
+.titlebar .title { margin: 0 auto; }
+.titlebar .model { color: var(--amber2); }
+.ide-body { display: grid; grid-template-columns: 1.1fr .9fr; min-height: 520px; }
+.editor { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+.filetab { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font: 12px var(--mono); color: var(--muted); border-bottom: 1px solid var(--line); background: #10121a; }
+.filetab .badge { margin-left: auto; font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line2); }
+.badge.pending { color: var(--amber2); border-color: color-mix(in srgb, var(--amber) 50%, transparent); }
+.badge.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.badge.no { color: var(--ember); border-color: color-mix(in srgb, var(--ember) 45%, transparent); }
+.code { flex: 1; overflow: auto; padding: 12px 0; font: 12.5px/1.65 var(--mono); position: relative; }
+.code .ln { display: grid; grid-template-columns: 46px 18px 1fr; white-space: pre; padding-right: 12px; }
+.code .ln span:first-child { color: #4b505d; text-align: right; padding-right: 12px; }
+.code .ln .g { color: #4b505d; }
+.code .add { background: color-mix(in srgb, var(--green) 13%, transparent); } .code .add .g { color: var(--green); }
+.code .del { background: color-mix(in srgb, var(--ember) 13%, transparent); } .code .del .g { color: var(--ember); }
+.code .add, .code .del { animation: slidein .35s ease both; }
+@keyframes slidein { from { opacity: 0; transform: translateX(-6px); } }
+.code .empty { color: var(--faint); padding: 30px; font-family: var(--sans); font-size: 14px; }
+.quickpick { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: min(430px, 92%); background: #1c2030; border: 1px solid var(--line2); border-radius: 10px; box-shadow: 0 20px 50px -10px rgba(0,0,0,.8); font: 12px var(--sans); overflow: hidden; animation: drop .3s ease both; }
+@keyframes drop { from { opacity: 0; transform: translate(-50%, -8px); } }
+.quickpick header { padding: 9px 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.quickpick label { display: flex; gap: 10px; align-items: center; padding: 9px 12px; color: var(--text); font-family: var(--mono); }
+.quickpick .tick { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line2); display: grid; place-items: center; font-size: 11px; transition: background .25s; }
+.quickpick .tick.on { background: var(--green); color: #052414; border-color: transparent; }
+.quickpick .tick.off { background: var(--ember); color: #2a0702; border-color: transparent; }
+.terminal { height: 150px; border-top: 1px solid var(--line); background: #0b0c10; padding: 10px 14px; font: 12px/1.6 var(--mono); overflow: auto; color: #c8c2b8; }
+.terminal .ps { color: var(--blue); }
+.terminal .out { color: #a8a299; white-space: pre-wrap; }
+.terminal .good { color: var(--green); }
+.side { display: flex; flex-direction: column; min-width: 0; background: #0f1117; }
+.side header { height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); font: 600 12px var(--sans); }
+.side header .state { font: 11px var(--mono); color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.side header .state i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.side header .state.run i { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 1s infinite; }
+.side header .state.wait i { background: var(--amber2); }
+.side header .state.ok i { background: var(--green); }
+.side header .state.err i { background: var(--ember); }
+@keyframes blink { 50% { opacity: .35; } }
+.log { flex: 1; overflow: auto; padding: 10px 12px 14px; font: 11.8px/1.55 var(--mono); scroll-behavior: smooth; }
+.row { display: grid; grid-template-columns: 70px 1fr; gap: 8px; padding: 3px 0; animation: fadein .3s ease both; }
+@keyframes fadein { from { opacity: 0; transform: translateY(3px); } }
+.row .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; padding-top: 1px; }
+.row .t { color: #cfc9bf; word-break: break-word; }
+.row.user .t { color: var(--text); font-family: var(--sans); font-size: 13px; background: var(--panel2); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); }
+.k.user { color: var(--muted); } .k.context { color: var(--violet); } .k.call { color: var(--blue); } .k.result { color: var(--faint); } .row.result .t { color: #8f897f; }
+.k.review { color: var(--amber2); } .k.apply { color: var(--green); } .k.error { color: var(--ember); } .row.error .t { color: #ffb4aa; } .k.info { color: var(--muted); } .k.done { color: var(--green); } .row.done .t { color: var(--green); }
+.controls { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-top: 1px solid var(--line); background: #12141a; }
+.controls button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line2); background: var(--panel2); color: var(--text); cursor: pointer; display: grid; place-items: center; transition: background .2s, border-color .2s; }
+.controls button:hover { border-color: var(--amber); }
+.controls .speed { width: auto; padding: 0 12px; border-radius: 999px; font: 600 12px var(--mono); }
+.track { position: relative; flex: 1; height: 26px; cursor: pointer; }
+.track .bar { position: absolute; left: 0; right: 0; top: 11px; height: 4px; border-radius: 4px; background: var(--line); }
+.track .fill { position: absolute; left: 0; top: 11px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--amber), var(--amber2)); width: 0; }
+.track .tick { position: absolute; top: 7px; width: 3px; height: 12px; border-radius: 2px; opacity: .8; transform: translateX(-1px); }
+.controls .clock { font: 12px var(--mono); color: var(--muted); min-width: 92px; text-align: right; }
+.replay-note { color: var(--faint); font-size: 13px; margin-top: 14px; }
+
+/* approval loop */
+.steps { margin-top: 56px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; position: relative; }
+.steps::before { content: ""; position: absolute; left: 4%; right: 4%; top: 25px; height: 2px; background: var(--line); }
+.steps .prog { position: absolute; left: 4%; top: 25px; height: 2px; width: 0; background: linear-gradient(90deg, var(--blue), var(--amber), var(--green)); transition: width 1.2s cubic-bezier(.2,.7,.2,1); }
+.step { position: relative; padding: 0 18px 0 0; opacity: .35; transform: translateY(10px); transition: opacity .6s, transform .6s; }
+.step.on { opacity: 1; transform: none; }
+.step .num { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font: 600 18px var(--serif); background: var(--bg); border: 1.5px solid var(--line2); position: relative; z-index: 1; }
+.step.on .num { border-color: currentColor; box-shadow: 0 0 24px -4px currentColor; }
+.step h3 { font-size: 20px; margin: 22px 0 8px; line-height: 1.15; }
+.step p { font-size: 14px; color: var(--muted); margin: 0; }
+.step code { font: 12px var(--mono); color: var(--text); background: var(--panel); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); }
+
+/* context field */
+.context-grid { margin-top: 48px; display: grid; grid-template-columns: 1.35fr .65fr; gap: 28px; align-items: start; }
+.field { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r-l); padding: 26px; position: relative; overflow: hidden; }
+.field .cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.field h4 { margin: 0 0 12px; font: 600 11px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.field h4 span { color: var(--faint); font-weight: 400; }
+.dotset { display: flex; flex-wrap: wrap; gap: 5px; }
+.dot { width: 11px; height: 11px; border-radius: 3px; background: #232733; transition: background .5s, box-shadow .5s, transform .5s; position: relative; }
+.dot.pack { background: var(--violet); box-shadow: 0 0 12px var(--violet); transform: scale(1.25); }
+.dot.seen { background: var(--blue); box-shadow: 0 0 10px var(--blue); transform: scale(1.15); }
+.dot.edit { background: var(--green); box-shadow: 0 0 14px var(--green); transform: scale(1.35); }
+.dot:hover::after { content: attr(data-f); position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); white-space: nowrap; font: 11px var(--mono); background: #000; color: var(--text); padding: 4px 7px; border-radius: 5px; z-index: 5; pointer-events: none; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 22px; font: 12px var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.budget { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); padding: 24px; }
+.budget .num { font: 600 44px/1 var(--serif); letter-spacing: -.02em; }
+.budget .num small { font-size: 18px; color: var(--muted); font-weight: 400; }
+.meter { height: 10px; border-radius: 10px; background: var(--line); margin: 16px 0 6px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--violet), var(--blue)); border-radius: 10px; transition: width 1.6s cubic-bezier(.2,.7,.2,1); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+.chips span { font: 11.5px var(--mono); padding: 4px 9px; border-radius: 999px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: #d9ccff; border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent); }
+.budget ol { margin: 18px 0 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+.budget ol li { margin: 6px 0; } .budget ol b { color: var(--text); font-weight: 600; }
+
+/* resilience */
+.res { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.lane { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r-l); padding: 26px 26px 18px; }
+.lane h3 { font-size: 22px; margin-bottom: 4px; } .lane > p { color: var(--muted); font-size: 14px; margin: 0 0 20px; }
+.ev { display: grid; grid-template-columns: 18px 1fr; gap: 14px; position: relative; padding-bottom: 18px; }
+.ev::before { content: ""; position: absolute; left: 8px; top: 18px; bottom: 0; width: 2px; background: var(--line); }
+.ev:last-child::before { display: none; }
+.ev i { width: 18px; height: 18px; border-radius: 50%; margin-top: 2px; border: 2px solid; background: var(--bg2); position: relative; z-index: 1; }
+.ev.e i { border-color: var(--ember); } .ev.r i { border-color: var(--amber2); } .ev.f i { border-color: var(--blue); } .ev.ok i { border-color: var(--green); background: var(--green); }
+.ev b { font-size: 14px; font-weight: 600; display: block; }
+.ev span { font: 12px/1.5 var(--mono); color: var(--muted); display: block; margin-top: 3px; word-break: break-word; }
+.ev.e span { color: #f0a89e; }
+
+/* results bento */
+.bento { margin-top: 48px; display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(120px, auto); gap: 18px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m); padding: 22px; position: relative; overflow: hidden; transition: transform .3s, border-color .3s; }
+.card:hover { transform: translateY(-3px); border-color: var(--line2); }
+.card .tag { font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.card h3 { font-size: 24px; margin: 10px 0 12px; line-height: 1.1; }
+.card pre { margin: 0; font: 12px/1.6 var(--mono); color: #cfc9bf; white-space: pre-wrap; word-break: break-word; }
+.card pre .a { color: var(--green); } .card pre .d { color: var(--ember); } .card pre .m { color: var(--amber2); } .card pre .c { color: var(--faint); }
+.c-a { grid-column: span 4; } .c-b { grid-column: span 2; } .c-c { grid-column: span 2; } .c-d { grid-column: span 2; } .c-e { grid-column: span 2; }
+.big { font: 600 64px/1 var(--serif); letter-spacing: -.03em; }
+.big small { font-size: 22px; color: var(--muted); font-weight: 400; }
+.card .foot { color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+/* video */
+.video { margin-top: 40px; border-radius: var(--r-l); overflow: hidden; border: 1px solid var(--line2); background: #000; box-shadow: 0 50px 120px -50px color-mix(in srgb, var(--amber) 45%, transparent); }
+.video video { display: block; width: 100%; height: auto; }
+
+/* stack + footer */
+.stack { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
+.stack div { padding: 22px 22px 22px 0; border-bottom: 1px solid var(--line); }
+.stack b { display: block; font: 600 16px var(--sans); margin-bottom: 4px; }
+.stack span { color: var(--muted); font-size: 14px; }
+.honest { margin-top: 36px; padding: 22px 24px; border-radius: var(--r-m); border: 1px dashed var(--line2); color: var(--muted); font-size: 14px; }
+.honest b { color: var(--text); }
+footer { margin-top: 120px; padding: 46px 0 60px; border-top: 1px solid var(--line); }
+footer .wrap { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; align-items: end; }
+footer .big-name { font: 800 clamp(48px, 9vw, 120px)/.9 var(--serif); letter-spacing: -.04em; color: transparent; -webkit-text-stroke: 1px var(--line2); }
+footer p { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .8s ease, transform .8s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (max-width: 980px) {
+  .hero .wrap, .context-grid, .res { grid-template-columns: 1fr; }
+  .ide-body { grid-template-columns: 1fr; }
+  .editor { border-right: 0; border-bottom: 1px solid var(--line); }
+  .log { max-height: 320px; }
+  .steps { grid-template-columns: 1fr; gap: 26px; } .steps::before, .steps .prog { display: none; }
+  .bento { grid-template-columns: 1fr 1fr; } .c-a { grid-column: span 2; } .c-b, .c-c, .c-d, .c-e { grid-column: span 1; }
+  .stack { grid-template-columns: 1fr; }
+  nav .links { display: none; }
+  .field .cols { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .wrap { width: calc(100% - 32px); }
+  .hero .stats { grid-template-columns: 1fr 1fr; }
+  .bento { grid-template-columns: 1fr; } .c-a, .c-b, .c-c, .c-d, .c-e { grid-column: span 1; }
+  .controls .clock { display: none; }
+  .tabs { flex-wrap: wrap; border-radius: 18px; } .tabs button { flex: 1 1 auto; }
+  .titlebar .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .row { grid-template-columns: 56px 1fr; }
+  section { padding-top: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<nav aria-label="Main">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="ForgePilot home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff5a47"/></linearGradient></defs><path d="M4 12h18c0 4-3 6-7 6v3h5v4H8v-4h5v-3C8 18 4 16 4 12Z" fill="url(#lg)"/><path d="M22 12l6-3v6l-6-1z" fill="#ff8a1f"/><circle cx="25" cy="5" r="1.6" fill="#ffb35c"/><circle cx="20" cy="4" r="1" fill="#ff8a1f"/></svg>
+      ForgePilot
+    </a>
+    <div class="links">
+      <a href="#replay">Replay</a><a href="#loop">Approval loop</a><a href="#context">Context</a><a href="#resilience">Resilience</a><a href="#results">Results</a><a href="#video">Video</a>
+    </div>
+    <a class="btn" href="https://github.com/Darshanpawar7/forgepilot">GitHub ↗</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">TrueFoundry Forge-a-thon · Techfest IIT Bombay</span>
+      <h1>A coding agent that <span class="thin">asks</span> before it writes.</h1>
+      <p><b>ForgePilot</b> is a VS Code extension whose agent loop runs on <b>TrueForge</b>. The editor becomes a set of MCP tools, and TrueForge's own tool approval opens every proposed edit in VS Code's diff editor, hunk by hunk, <b>before a single byte reaches disk</b>.</p>
+      <div class="cta">
+        <a class="btn hot" href="#replay">▶ Watch the real run</a>
+        <a class="btn" href="#video">Demo video</a>
+        <a class="btn" href="writeup.pdf">Write-up (PDF)</a>
+      </div>
+    </div>
+    <div class="loop" aria-label="Diagram: the model proposes an edit through TrueForge, TrueForge pauses for approval, VS Code shows the diff, and only accepted hunks are written through the MCP tool.">
+      <svg viewBox="0 0 520 480" role="img">
+        <defs>
+          <linearGradient id="heat" x1="0" x2="1"><stop offset="0" stop-color="#73a7ff"/><stop offset=".5" stop-color="#ff8a1f"/><stop offset="1" stop-color="#3fd68f"/></linearGradient>
+          <radialGradient id="glow"><stop offset="0" stop-color="#ff8a1f" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a1f" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="260" cy="236" r="150" fill="url(#glow)"/>
+        <path id="p1" class="wire" d="M260 70 C 400 70 450 150 450 236"/>
+        <path id="p2" class="wire" d="M450 236 C 450 330 390 400 260 400"/>
+        <path id="p3" class="wire" d="M260 400 C 130 400 70 330 70 236"/>
+        <path id="p4" class="wire" d="M70 236 C 70 150 120 70 260 70"/>
+        <g class="node" transform="translate(185 40)"><rect width="150" height="60" rx="12"/><text x="16" y="26">Gemini</text><text class="sub" x="16" y="45">proposes edit_file</text></g>
+        <g class="node" transform="translate(375 206)"><rect width="140" height="60" rx="12" style="stroke:#ff8a1f"/><text x="16" y="26">TrueForge</text><text class="sub" x="16" y="45">pauses: approval</text></g>
+        <g class="node" transform="translate(185 370)"><rect width="150" height="60" rx="12" style="stroke:#73a7ff"/><text x="16" y="26">VS Code diff</text><text class="sub" x="16" y="45">tick hunks</text></g>
+        <g class="node" transform="translate(5 206)"><rect width="130" height="60" rx="12" style="stroke:#3fd68f"/><text x="16" y="26">MCP tool</text><text class="sub" x="16" y="45">writes accepted</text></g>
+        <g transform="translate(260 236)">
+          <circle class="gate-ring" r="62"/>
+          <circle r="46" fill="#151820" stroke="#323846"/>
+          <text text-anchor="middle" y="-4" style="font:600 13px Inter;fill:#ece6dc">review</text>
+          <text text-anchor="middle" y="14" style="font:400 11px 'JetBrains Mono';fill:#ffb35c">gate</text>
+        </g>
+        <circle class="packet" r="6" fill="#ffb35c" style="color:#ff8a1f"><animateMotion dur="2.2s" repeatCount="indefinite" begin="0s"><mpath href="#p1"/></animateMotion></circle>
+        <circle class="packet" r="6" fill="#73a7ff" style="color:#73a7ff"><animateMotion dur="2.2s" repeatCount="indefinite" begin="-1.65s"><mpath href="#p2"/></animateMotion></circle>
+        <circle class="packet" r="6" fill="#3fd68f" style="color:#3fd68f"><animateMotion dur="2.2s" repeatCount="indefinite" begin="-1.1s"><mpath href="#p3"/></animateMotion></circle>
+        <circle class="packet" r="5" fill="#b597ff" style="color:#b597ff"><animateMotion dur="2.2s" repeatCount="indefinite" begin="-0.55s"><mpath href="#p4"/></animateMotion></circle>
+      </svg>
+      <div class="caption">Nothing is written until it passes the <b>review gate</b>.</div>
+    </div>
+  </div>
+  <div class="wrap stats">
+    <div><b>17<i>k</i></b><span>lines of Flask 3.1.3 code and tests, never sent whole</span></div>
+    <div><b>7</b><span>editor tools served over MCP</span></div>
+    <div><b><i>0</i></b><span>writes without a hunk review</span></div>
+    <div><b>₹0</b><span>model cost on the free Gemini tier</span></div>
+  </div>
+</header>
+
+<section id="replay">
+  <div class="wrap">
+    <div class="replay-head reveal">
+      <div>
+        <span class="eyebrow">Replay · the recorded run</span>
+        <h2>Watch it think, <em>then wait for you.</em></h2>
+        <p class="lede">These are the actual events from the recorded demo run on Flask 3.1.3: the context pack, every tool call, the review gate, the retries and the results. Pick a task and press play.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Task">
+        <button role="tab" aria-selected="true" data-task="A">Task A · Inline edit</button>
+        <button role="tab" aria-selected="false" data-task="B">Task B · Agent mode</button>
+        <button role="tab" aria-selected="false" data-task="X">Cancel</button>
+        <button role="tab" aria-selected="false" data-task="C">Task C · Resilience</button>
+      </div>
+    </div>
+    <div class="ide reveal" id="ide">
+      <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><span class="title">flask-testbed · Visual Studio Code</span><span class="model" id="model">gemini-3-5-flash-lite</span></div>
+      <div class="ide-body">
+        <div class="editor">
+          <div class="filetab"><span id="fname">src/flask/helpers.py</span><span class="badge" id="fbadge" hidden></span></div>
+          <div class="code" id="code"><div class="empty">The editor shows each proposed change here, as a diff.</div></div>
+          <div class="terminal" id="term" aria-live="polite"><span class="ps">PS C:\flask-testbed&gt;</span></div>
+        </div>
+        <div class="side">
+          <header><span>ForgePilot · agent mode on TrueForge</span><span class="state" id="state"><i></i><span id="stateText">idle</span></span></header>
+          <div class="log" id="log" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="play" aria-label="Play">▶</button>
+        <button id="restart" aria-label="Restart">↺</button>
+        <div class="track" id="track" aria-label="Progress"><div class="bar"></div><div class="fill" id="fill"></div></div>
+        <button class="speed" id="speed" aria-label="Playback speed">1×</button>
+        <span class="clock" id="clock">0 / 0 events</span>
+      </div>
+    </div>
+    <p class="replay-note">Timing is compressed; the wording of every line comes from ForgePilot's log of the recorded run. Long tool results are shortened.</p>
+  </div>
+</section>
+
+<section id="loop">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>TrueForge's approval is <em>the</em> review button.</h2>
+      <p class="lede">ForgePilot doesn't bolt a confirm dialog onto a chatbot. It lists the write tools in TrueForge's <span class="mono">requireApprovalForTools</span>, so the agent loop itself stops and waits for the diff review.</p>
+    </div>
+    <div class="steps" id="steps">
+      <div class="prog" id="prog"></div>
+      <div class="step" style="color:var(--blue)"><div class="num">1</div><h3>The agent calls a tool</h3><p>Gemini, running inside TrueForge, calls <code>edit_file</code> on the extension's MCP server.</p></div>
+      <div class="step" style="color:var(--amber)"><div class="num">2</div><h3>TrueForge pauses</h3><p>The turn stops with <code>tool.approval_required</code>. The stream stays open.</p></div>
+      <div class="step" style="color:var(--amber2)"><div class="num">3</div><h3>You review hunks</h3><p>ForgePilot builds the whole proposed file and opens VS Code's diff editor with a tick list of hunks.</p></div>
+      <div class="step" style="color:var(--violet)"><div class="num">4</div><h3>Allow or deny</h3><p><code>user.tool_approval</code> goes back to TrueForge, with a reason the agent can act on if you deny.</p></div>
+      <div class="step" style="color:var(--green)"><div class="num">5</div><h3>Only then, the write</h3><p>The MCP tool writes exactly the accepted hunks through a <code>WorkspaceEdit</code>, and the change can be undone.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="context">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Context assembly</span>
+      <h2>214 files. <em>A few</em> make the cut.</h2>
+      <p class="lede">Every request starts with a budgeted context pack: keywords from the request, every text file scored by rarity-weighted hits, and snippets from the strongest. Then the agent searches for the rest on its own. Here is Task B.</p>
+    </div>
+    <div class="context-grid">
+      <div class="field reveal" id="field">
+        <div class="cols" id="cols"></div>
+        <div class="legend"><span><i style="background:var(--violet)"></i>in the context pack</span><span><i style="background:var(--blue)"></i>found by the agent's own searches</span><span><i style="background:var(--green)"></i>edited (after review)</span><span><i style="background:#232733"></i>never sent</span></div>
+      </div>
+      <div class="budget reveal">
+        <div class="num" id="budgetNum">0 <small>/ 24,000 chars</small></div>
+        <div class="meter"><i id="meter"></i></div>
+        <span class="mono" style="color:var(--faint);font-size:12px">context budget used by the Task B pack</span>
+        <div class="chips"><span>built</span><span>cli</span><span>command</span><span>flask</span><span>config</span><span>prints</span><span>loaded</span><span>json</span><span>masking</span><span>secret</span><span>password</span><span>token</span><span>help</span><span>test</span><span>documented</span></div>
+        <ol>
+          <li><b>@mentions first:</b> <span class="mono">@path</span> and <span class="mono">@symbol</span> are added verbatim.</li>
+          <li><b>Rank:</b> IDF-weighted keyword hits plus a path boost; changelogs are down-weighted.</li>
+          <li><b>Snip:</b> a map of the top files, then snippets until the budget is full.</li>
+          <li><b>Explore:</b> <span class="mono">search_code</span>, <span class="mono">read_file</span>, <span class="mono">get_symbols</span>. The agent must read before it edits.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="resilience">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Resilience</span>
+      <h2>When a model fails, <em>your files don't.</em></h2>
+      <p class="lede">Rate limits and overloads get a real back-off, then the agent <b style="color:var(--text)">continues in the same TrueForge session</b>, so it keeps everything it already read and did. Hard errors fall back to the next model in your list. Because nothing is written without approval, a failure can't leave a half-applied edit.</p>
+    </div>
+    <div class="res">
+      <div class="lane reveal">
+        <h3>Task B, live on the free tier</h3>
+        <p>The free Gemini tier rate-limited it six times.</p>
+        <div class="ev e"><i></i><div><b>Rate limited</b><span>gemini-3-5-flash-lite: Request failed (429): You exceeded your current quota</span></div></div>
+        <div class="ev r"><i></i><div><b>Back off, keep the session</b><span>Waiting 20s, then continuing on gemini-3-5-flash-lite (attempt 2 of 4). Continuing TrueForge session … with a new turn; the agent keeps its history.</span></div></div>
+        <div class="ev r"><i></i><div><b>Again, longer</b><span>429 → wait 40s → continue · 429 → wait 60s → continue. Code, test and docs land in between.</span></div></div>
+        <div class="ev f"><i></i><div><b>Automatic fallback</b><span>Falling back to gemini-3-1-flash-lite automatically. The 6 change(s) you already accepted stay in place (Undo reverts them).</span></div></div>
+        <div class="ev ok"><i></i><div><b>Done</b><span>56 passed · flask config masked · in flask --help · docs updated</span></div></div>
+      </div>
+      <div class="lane reveal">
+        <h3>Task C, a broken model on purpose</h3>
+        <p>The first model in the list has an invalid API key.</p>
+        <div class="ev e"><i></i><div><b>Hard failure</b><span>openai/gpt-5-4-mini failed: Request failed (401): Invalid API Key</span></div></div>
+        <div class="ev f"><i></i><div><b>Straight to the fallback</b><span>Falling back to gemini-3-5-flash-lite automatically. Your files were not changed.</span></div></div>
+        <div class="ev r"><i></i><div><b>Review gate</b><span>review requested: src/flask/helpers.py → rejected</span></div></div>
+        <div class="ev ok"><i></i><div><b>Clean tree</b><span>You rejected the change, so nothing was written. git status: (empty)</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Results</span>
+      <h2>Verified on screen, <em>not claimed.</em></h2>
+    </div>
+    <div class="bento">
+      <div class="card c-a reveal">
+        <span class="tag" style="color:var(--green)">Task A · the applied diff</span>
+        <h3>"off" and "n" now mean false</h3>
+<pre><span class="c">@@ -28,9 +28,12 @@ src/flask/helpers.py</span>
+ def get_debug_flag() -&gt; bool:
+     """Get whether debug mode should be enabled for the app, indicated by the
+     :envvar:`FLASK_DEBUG` environment variable. The default is ``False``.
+<span class="a">+
++    Values like ``"0"``, ``"false"``, ``"no"``, ``"off"``, and ``"n"`` are
++    treated as false, case-insensitively.</span>
+     """
+     val = os.environ.get("FLASK_DEBUG")
+<span class="d">-    return bool(val and val.lower() not in {"0", "false", "no"})</span>
+<span class="a">+    return bool(val and val.lower() not in {"0", "false", "no", "off", "n"})</span></pre>
+      </div>
+      <div class="card c-b reveal">
+        <span class="tag" style="color:var(--blue)">Task A · terminal</span>
+        <h3>FLASK_DEBUG=off</h3>
+        <div class="big">False</div>
+        <div class="foot">then <span class="mono">Undo Last Applied Change</span> reverted it on screen</div>
+      </div>
+      <div class="card c-c reveal">
+        <span class="tag" style="color:var(--amber2)">Task B · flask config</span>
+        <h3>Secrets masked</h3>
+<pre>{
+  "API_TOKEN": <span class="m">"***"</span>,
+  "DATABASE_PASSWORD": <span class="m">"***"</span>,
+  "DEBUG": false,
+  "GREETING": "hello",
+  "SECRET_KEY": <span class="m">"***"</span>,
+  "STRIPE_KEY": <span class="m">"***"</span>,
+  …
+}</pre>
+      </div>
+      <div class="card c-d reveal">
+        <span class="tag" style="color:var(--green)">Task B · tests</span>
+        <h3>tests/test_cli.py</h3>
+        <div class="big">56 <small>passed</small></div>
+        <div class="foot">3 skipped · 55 existing tests plus the agent's new <span class="mono">test_config_command</span></div>
+      </div>
+      <div class="card c-e reveal">
+        <span class="tag" style="color:var(--violet)">Task B · flask --help</span>
+        <h3>A built-in command</h3>
+<pre>Commands:
+  <span class="a">config  Show the app's configuration.</span>
+  routes  Show the routes for the app.
+  run     Run a development server.
+  shell   Run a shell in the app context.</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="video">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Demo video · under 4 minutes</span>
+      <h2>Tasks A, B, cancel and C, <em>end to end.</em></h2>
+      <p class="lede">The recorded run, narrated, with on-screen verification after each task. Stretches where the model is thinking are sped up and labelled.</p>
+    </div>
+    <div class="video reveal">
+      <video controls preload="metadata" poster="media/poster.jpg" playsinline>
+        <source src="media/forgepilot-demo.mp4" type="video/mp4">
+        Your browser can't play this video. <a href="media/forgepilot-demo.mp4">Download it</a>.
+      </video>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow">Under the hood</span>
+      <h2>Small surface, <em>deep integration.</em></h2>
+    </div>
+    <div class="stack reveal">
+      <div><b>TrueForge local mode</b><span>Runs the agent loop, sessions, tool approval, compaction and dynamic sub-agents. The extension never calls a model provider.</span></div>
+      <div><b>MCP server in the extension</b><span>Streamable HTTP on 127.0.0.1 with a random bearer token: list_files, search_code, get_symbols, read_file, edit_file, create_file, run_command.</span></div>
+      <div><b>Diff review</b><span>VS Code's diff editor plus a hunk checklist (jsdiff). Partial accepts write only the ticked hunks.</span></div>
+      <div><b>Back-off, resume, fallback</b><span>429s wait 20 / 40 / 60 s, overloads 5 / 10 / 20 s, then a new turn continues the same session. Hard errors fall back through forgepilot.models. No keys in the repository.</span></div>
+      <div><b>Cancellation</b><span>sessions.cancel, running commands killed, pending reviews dropped. Edits are atomic, so nothing is half-applied.</span></div>
+      <div><b>Undo</b><span>Every applied change goes on an undo stack; one command reverts it.</span></div>
+    </div>
+    <div class="honest reveal"><b>Honest notes.</b> The demo's review clicks are scripted so it fits in four minutes; the same review UI is used by hand. In the recorded Task B, one of the agent's edits didn't match the file text and was rejected automatically; it re-read the file and retried. The free tier rate-limited it six times, which is why the video speeds those waits up. The write-up lists all limitations and the tools used, including the AI assistance used while building.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="big-name">FLOWSTATE</div>
+      <p>Darshan P Pawar · PES University, Bengaluru · Team ID TM-E8DADAC3DAF</p>
+    </div>
+    <div class="cta">
+      <a class="btn" href="https://github.com/Darshanpawar7/forgepilot">Source on GitHub ↗</a>
+      <a class="btn" href="writeup.pdf">Write-up PDF</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- reveal on scroll ---------- */
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+  /* ---------- approval loop steps ---------- */
+  const steps = [...document.querySelectorAll(".step")];
+  const prog = document.getElementById("prog");
+  new IntersectionObserver((es, o) => {
+    if (!es[0].isIntersecting) return;
+    o.disconnect();
+    steps.forEach((s, i) => setTimeout(() => { s.classList.add("on"); prog.style.width = `${(i / (steps.length - 1)) * 92}%`; }, reduce ? 0 : 350 * i));
+  }, { threshold: .4 }).observe(document.getElementById("steps"));
+
+  /* ---------- context field ---------- */
+  const PACK = ["src/flask/app.py", "docs/config.rst", "src/flask/sansio/app.py", "docs/quickstart.rst", "src/flask/cli.py"];
+  const SEEN = ["docs/cli.rst", "tests/test_cli.py", "docs/tutorial/database.rst", "tests/test_basic.py"];
+  const EDIT = ["src/flask/cli.py"];
+  fetch("media/flask-files.json").then((r) => r.json()).then((files) => {
+    const groups = { "src": [], "tests": [], "docs": [], "examples": [], "other": [] };
+    files.forEach((f) => { const top = f.split("/")[0]; (groups[top] || groups.other).push(f); });
+    const cols = document.getElementById("cols");
+    const dots = {};
+    for (const [name, list] of Object.entries(groups)) {
+      const col = document.createElement("div");
+      col.innerHTML = `<h4>${name} <span>${list.length}</span></h4><div class="dotset"></div>`;
+      const set = col.querySelector(".dotset");
+      list.forEach((f) => { const d = document.createElement("span"); d.className = "dot"; d.dataset.f = f; set.appendChild(d); dots[f] = d; });
+      cols.appendChild(col);
+    }
+    const light = () => {
+      const seq = [...PACK.map((f) => [f, "pack"]), ...SEEN.map((f) => [f, "seen"]), ...EDIT.map((f) => [f, "edit"])];
+      seq.forEach(([f, c], i) => setTimeout(() => { const d = dots[f]; if (d) { d.classList.remove("pack", "seen"); d.classList.add(c); } }, reduce ? 0 : 260 * i));
+      document.getElementById("meter").style.width = `${(9506 / 24000) * 100}%`;
+      const num = document.getElementById("budgetNum");
+      const t0 = performance.now();
+      const tick = (t) => { const k = reduce ? 1 : Math.min(1, (t - t0) / 1400); num.innerHTML = `${Math.round(9506 * k).toLocaleString("en-IN")} <small>/ 24,000 chars</small>`; if (k < 1) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    };
+    new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { o.disconnect(); light(); } }, { threshold: .35 }).observe(document.getElementById("field"));
+  }).catch(() => { document.getElementById("cols").textContent = "(file map unavailable offline)"; });
+
+  /* ---------- replay ---------- */
+  const DIFF_A = [
+    [28, " ", "def get_debug_flag() -> bool:"],
+    [29, " ", '    """Get whether debug mode should be enabled for the app, indicated by the'],
+    [30, " ", "    :envvar:`FLASK_DEBUG` environment variable. The default is ``False``."],
+    [31, "+", ""],
+    [32, "+", '    Values like ``"0"``, ``"false"``, ``"no"``, ``"off"``, and ``"n"`` are'],
+    [33, "+", "    treated as false, case-insensitively."],
+    [34, " ", '    """'],
+    [35, " ", '    val = os.environ.get("FLASK_DEBUG")'],
+    [36, "-", '    return bool(val and val.lower() not in {"0", "false", "no"})'],
+    [36, "+", '    return bool(val and val.lower() not in {"0", "false", "no", "off", "n"})'],
+  ];
+  const DIFF_B1 = [
+    [594, " ", "            self.add_command(run_command)"],
+    [595, " ", "            self.add_command(shell_command)"],
+    [596, " ", "            self.add_command(routes_command)"],
+    [597, "+", "            self.add_command(config_command)"],
+  ];
+  const DIFF_B2 = [
+    [1118, "+", '@click.command("config", short_help="Show the app\'s configuration.")'],
+    [1119, "+", "@with_appcontext"],
+    [1120, "+", "def config_command() -> None:"],
+    [1121, "+", '    """Show the application\'s configuration as JSON.'],
+    [1122, "+", ""],
+    [1123, "+", '    Values for keys containing SECRET, PASSWORD, TOKEN, or KEY are masked.'],
+    [1124, "+", '    """'],
+    [1125, "+", "    config_dict = {}"],
+    [1126, "+", ""],
+    [1127, "+", "    for key, value in current_app.config.items():"],
+    [1128, "+", '        if any(token in key.upper() for token in ("SECRET", "PASSWORD", "TOKEN", "KEY")):'],
+    [1129, "+", '            config_dict[key] = "***"'],
+    [1130, "+", "        else:"],
+    [1131, "+", "            try:"],
+    [1132, "+", "                current_app.json.dumps(value)"],
+    [1133, "+", "                config_dict[key] = value"],
+    [1134, "+", "            except Exception:"],
+    [1135, "+", "                config_dict[key] = str(value)"],
+    [1136, "+", ""],
+    [1137, "+", "    click.echo(current_app.json.dumps(config_dict, indent=2))"],
+  ];
+  const DIFF_B3 = [
+    [704, "+", "def test_config_command(runner):"],
+    [705, "+", "    app = Flask(__name__)"],
+    [706, "+", '    app.config["SECRET_KEY"] = "super-secret"'],
+    [707, "+", '    app.config["DATABASE_PASSWORD"] = "12345"'],
+    [708, "+", '    app.config["API_TOKEN"] = "abc-token"'],
+    [709, "+", '    app.config["SOME_API_KEY"] = "key123"'],
+    [712, "+", "    cli = FlaskGroup(create_app=lambda: app)"],
+    [713, "+", '    result = runner.invoke(cli, ["config"])'],
+    [714, "+", "    assert result.exit_code == 0"],
+    [716, "+", "    data = json.loads(result.output)"],
+    [717, "+", '    assert data["SECRET_KEY"] == "***"'],
+    [720, "+", '    assert data["SOME_API_KEY"] == "***"'],
+    [721, "+", '    assert data["DEBUG"] is False'],
+  ];
+  const DIFF_B4 = [
+    [149, "+", "Show Configuration"],
+    [150, "+", "------------------"],
+    [151, "+", ""],
+    [152, "+", "To print the loaded application's configuration as JSON, use the"],
+    [153, "+", ":func:`config <cli.config_command>` command. Values of any configuration keys"],
+    [154, "+", "containing ``SECRET``, ``PASSWORD``, ``TOKEN``, or ``KEY`` are masked as"],
+    [155, "+", '``"***"`` to prevent revealing sensitive information. ::'],
+    [156, "+", ""],
+    [157, "+", "    $ flask config"],
+    [158, "+", '      "SECRET_KEY": "***",'],
+  ];
+
+  const TASKS = {
+    A: { model: "gemini-3-5-flash-lite", file: "src/flask/helpers.py", events: [
+      ["user", "Inline edit of src/flask/helpers.py, lines 28-33. Treat the values 'off' and 'n' as false as well, case-insensitively, and update the docstring to list every value that is treated as false."],
+      ["context", "budget 9392/24000 chars · keywords: inline, edit, flask, helpers, treat, off, false, case, insensitively, docstring…"],
+      ["context", "Selection (the code you selected)"],
+      ["context", "src/flask/helpers.py:436-471 (best hit for \"inline\", \"off\")"],
+      ["context", "src/flask/cli.py:18-53 (best hit for \"off\", \"helpers\")"],
+      ["info", "TrueForge session 01m7wss6xkafsh0r1ypwqtr3ck · model google-gemini/gemini-3-5-flash-lite", "run"],
+      ["call", "read_file src/flask/helpers.py:20-45"],
+      ["result", "20  from .globals import request_ctx | 21  from .globals import session | …"],
+      ["call", "edit_file src/flask/helpers.py"],
+      ["review", "TrueForge paused the turn (tool.approval_required) · review requested: src/flask/helpers.py", "wait", { diff: DIFF_A, file: "src/flask/helpers.py", hunks: ["Hunk 1  @@ -28,9 +28,12 @@  +3 -0", "Hunk 2  @@ -36 +36 @@  +1 -1"] }],
+      ["review", "accepted all hunks of src/flask/helpers.py", "run", { accept: true }],
+      ["apply", "updated src/flask/helpers.py (WorkspaceEdit)"],
+      ["done", "Done. Use “ForgePilot: Undo Last Applied Change” to revert.", "ok"],
+      ["term", "$env:FLASK_DEBUG='off'; python -c \"from flask.helpers import get_debug_flag; print(get_debug_flag())\"", "False"],
+      ["apply", "undone: src/flask/helpers.py"],
+    ] },
+    B: { model: "gemini-3-5-flash-lite", file: "src/flask/cli.py", events: [
+      ["user", "Add a new built-in CLI command flask config that prints the loaded application's configuration as JSON, masking the values of any key containing SECRET, PASSWORD, TOKEN or KEY as \"***\". It must appear in flask --help, be covered by a test, and be documented alongside the other built-in commands."],
+      ["context", "budget 9506/24000 chars · keywords: built, cli, command, flask, config, prints, loaded, json, masking, secret, password, token, help, test, documented"],
+      ["context", "src/flask/app.py:248-283 (best hit for \"covered\", \"containing\")"],
+      ["context", "docs/quickstart.rst:502-537 (best hit for \"documented\", \"token\")"],
+      ["context", "src/flask/cli.py:32-67 (best hit for \"containing\", \"loaded\")"],
+      ["info", "TrueForge session 01m7y4g7hjjz5tgrkrtns6rnsd · model google-gemini/gemini-3-5-flash-lite", "run"],
+      ["error", "gemini-3-5-flash-lite is temporarily unavailable (429: You exceeded your current quota)", "err"],
+      ["info", "Waiting 20s, then continuing on gemini-3-5-flash-lite (attempt 2 of 4)", "run"],
+      ["info", "Continuing TrueForge session 01m7y4g7… with a new turn; the agent keeps its history.", "run"],
+      ["call", "read_file docs/cli.rst:350-500"],
+      ["call", "search_code /run/ in docs/cli.rst"],
+      ["call", "read_file docs/cli.rst:130-150"],
+      ["call", "run_command python -m pytest tests/test_cli.py -q"],
+      ["review", "approved command: python -m pytest tests/test_cli.py -q", "run"],
+      ["error", "429 again", "err"],
+      ["info", "Waiting 40s, then continuing the same session (attempt 3 of 4)", "run"],
+      ["call", "read_file src/flask/cli.py:1056-1117"],
+      ["call", "search_code /class TestRoutes/ in tests/test_cli.py"],
+      ["call", "edit_file src/flask/cli.py"],
+      ["review", "review requested: src/flask/cli.py", "wait", { diff: DIFF_B1, file: "src/flask/cli.py", hunks: ["Hunk 1  @@ -594,3 +594,4 @@  +1"] }],
+      ["review", "accepted all hunks of src/flask/cli.py", "run", { accept: true }],
+      ["apply", "updated src/flask/cli.py"],
+      ["call", "edit_file src/flask/cli.py"],
+      ["review", "review requested: src/flask/cli.py", "wait", { diff: DIFF_B2, file: "src/flask/cli.py", hunks: ["Hunk 1  @@ -1117 +1118,20 @@  +20"] }],
+      ["review", "accepted all hunks of src/flask/cli.py", "run", { accept: true }],
+      ["apply", "updated src/flask/cli.py"],
+      ["call", "edit_file tests/test_cli.py"],
+      ["review", "review requested: tests/test_cli.py", "wait", { diff: DIFF_B3, file: "tests/test_cli.py", hunks: ["Hunk 1  @@ -703 +704,22 @@  +22"] }],
+      ["review", "accepted all hunks of tests/test_cli.py", "run", { accept: true }],
+      ["apply", "updated tests/test_cli.py"],
+      ["call", "run_command python -m pytest tests/test_cli.py -q"],
+      ["result", "exit code: 1 | …………F  (json not imported in the test)"],
+      ["error", "429 again", "err"],
+      ["info", "Waiting 60s, then continuing the same session (attempt 4 of 4)", "run"],
+      ["call", "edit_file tests/test_cli.py"],
+      ["review", "auto-rejected (old_string was not found in tests/test_cli.py. Read the file again and copy the exact text.)", "run"],
+      ["call", "read_file tests/test_cli.py:1-30"],
+      ["call", "edit_file tests/test_cli.py  (+ import json)"],
+      ["review", "accepted all hunks of tests/test_cli.py", "run"],
+      ["call", "run_command python -m pytest tests/test_cli.py -q"],
+      ["result", "exit code: 0 | 56 passed, 3 skipped in 0.28s"],
+      ["call", "edit_file docs/cli.rst"],
+      ["review", "review requested: docs/cli.rst", "wait", { diff: DIFF_B4, file: "docs/cli.rst", hunks: ["Hunk 1  @@ -146 +146,18 @@  +18"] }],
+      ["review", "accepted all hunks of docs/cli.rst", "run", { accept: true }],
+      ["apply", "updated docs/cli.rst"],
+      ["error", "gemini-3-5-flash-lite failed: 429", "err"],
+      ["info", "Falling back to gemini-3-1-flash-lite automatically. The 6 change(s) you already accepted stay in place (Undo reverts them).", "run", { model: "gemini-3-1-flash-lite" }],
+      ["done", "Done. Review the changes in the editor; use “ForgePilot: Undo Last Applied Change” to revert.", "ok"],
+      ["term", "python -m pytest tests/test_cli.py -q", "56 passed, 3 skipped in 0.26s"],
+      ["term", "python -m flask --app demo_app.py config", "{ \"API_TOKEN\": \"***\", \"DATABASE_PASSWORD\": \"***\", \"DEBUG\": false, \"SECRET_KEY\": \"***\", … }"],
+      ["term", "python -m flask --app demo_app.py --help | Select-String config", "config  Show the app's configuration."],
+      ["term", "git diff --stat", "docs/cli.rst | 18 +, src/flask/cli.py | 23 +, tests/test_cli.py | 24 +  (65 insertions, 0 deletions)"],
+    ] },
+    X: { model: "gemini-3-5-flash-lite", file: "src/flask/helpers.py", events: [
+      ["user", "Add return type hints to every function in src/flask/helpers.py that is missing one."],
+      ["context", "budget used · keywords: return, type, hints, every, function, helpers, missing"],
+      ["info", "TrueForge session · model google-gemini/gemini-3-5-flash-lite", "run"],
+      ["call", "read_file src/flask/helpers.py:1-100"],
+      ["call", "get_symbols src/flask/helpers.py"],
+      ["call", "read_file src/flask/helpers.py:100-300"],
+      ["call", "read_file src/flask/helpers.py:301-642"],
+      ["call", "run_command pytest tests/test_helpers.py"],
+      ["review", "approved command: pytest tests/test_helpers.py", "run"],
+      ["error", "Cancel requested. (sessions.cancel + running command killed)", "err"],
+      ["result", "MCP error -32001: client-cancelled"],
+      ["done", "Cancelled. Nothing half-applied: only accepted hunks were ever written.", "ok"],
+      ["term", "git status --short; Write-Output '--- git status after Cancel (empty = nothing half-applied)'", "--- git status after Cancel (empty = nothing half-applied)"],
+    ] },
+    C: { model: "openai/gpt-5-4-mini", file: "src/flask/helpers.py", events: [
+      ["term", "git status --short; Write-Output 'git status: clean before Task C'", "git status: clean before Task C"],
+      ["user", "Inline edit of src/flask/helpers.py, lines 28-33 (same request as Task A). forgepilot.models = [openai/gpt-5-4-mini (invalid key), gemini-3-5-flash-lite]"],
+      ["info", "TrueForge session 01m7y50371p7f1140eccarmwzy · model openai/gpt-5-4-mini", "run"],
+      ["error", "Model openai/gpt-5-4-mini failed: [Model Error] Request failed (401): Invalid API Key", "err"],
+      ["info", "Falling back to google-gemini/gemini-3-5-flash-lite automatically. Your files were not changed.", "run", { model: "gemini-3-5-flash-lite" }],
+      ["info", "TrueForge session 01m7y503wy6s9vjbqy5e1n9btj · model google-gemini/gemini-3-5-flash-lite", "run"],
+      ["call", "read_file src/flask/helpers.py:20-45"],
+      ["call", "search_code /get_debug_flag/ → 3 hits in 1 file"],
+      ["call", "read_file tests/test_helpers.py:335-360"],
+      ["call", "edit_file src/flask/helpers.py"],
+      ["review", "review requested: src/flask/helpers.py", "wait", { diff: DIFF_A, file: "src/flask/helpers.py", hunks: ["Hunk 1  @@ -28,9 +28,12 @@  +3 -0", "Hunk 2  @@ -36 +36 @@  +1 -1"] }],
+      ["review", "rejected src/flask/helpers.py", "run", { accept: false }],
+      ["done", "You rejected the change, so nothing was written. Your files are unchanged.", "ok"],
+      ["term", "git status --short; Write-Output '--- git status after Task C (empty = no files changed)'", "--- git status after Task C (empty = no files changed)"],
+    ] },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const logEl = $("log"), codeEl = $("code"), termEl = $("term"), stateEl = $("state"), fill = $("fill"), track = $("track");
+  const LABEL = { user: "you", context: "context", call: "→ tool", result: "  ←", review: "review", apply: "applied", error: "error", info: "·", done: "done" };
+  const STATE = { run: ["run", "running"], wait: ["wait", "waiting for review"], ok: ["ok", "idle · done"], err: ["err", "model error"] };
+  let task = "A", idx = 0, timer = null, playing = false, speed = 1, started = false;
+
+  function setState(s) { if (!s) return; const [cls, txt] = STATE[s]; stateEl.className = "state " + cls; $("stateText").textContent = txt; }
+  function esc(s) { return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+  function showDiff(opt) {
+    $("fname").textContent = opt.file;
+    const b = $("fbadge"); b.hidden = false; b.className = "badge pending"; b.textContent = "proposed · not yet written";
+    codeEl.innerHTML = opt.diff.map(([n, g, t]) => `<div class="ln ${g === "+" ? "add" : g === "-" ? "del" : ""}"><span>${n}</span><span class="g">${g === " " ? "" : g}</span><span>${esc(t)}</span></div>`).join("")
+      + `<div class="quickpick" id="qp"><header>Review ${opt.hunks.length} hunk${opt.hunks.length > 1 ? "s" : ""}: tick to apply, untick to reject</header>${opt.hunks.map((h) => `<label><span class="tick">✓</span>${esc(h)}</label>`).join("")}</div>`;
+  }
+  function decide(accept) {
+    const qp = $("qp");
+    if (qp) qp.querySelectorAll(".tick").forEach((t) => { t.classList.add(accept ? "on" : "off"); t.textContent = accept ? "✓" : "✕"; });
+    const b = $("fbadge"); b.className = "badge " + (accept ? "ok" : "no"); b.textContent = accept ? "accepted · written" : "rejected · not written";
+    setTimeout(() => { const q = $("qp"); if (q) q.remove(); }, 900 / speed);
+  }
+  function term(cmd, out) {
+    termEl.insertAdjacentHTML("beforeend", ` <span>${esc(cmd)}</span>\n<span class="out ${/passed|False|clean|config  Show/.test(out) ? "good" : ""}">${esc(out)}</span>\n<span class="ps">PS C:\\flask-testbed&gt;</span>`);
+    termEl.scrollTop = termEl.scrollHeight;
+  }
+  function step() {
+    const evs = TASKS[task].events;
+    if (idx >= evs.length) { pause(); $("play").textContent = "↺"; return; }
+    const [kind, text, st, opt] = evs[idx++];
+    if (kind === "term") term(text, st);
+    else {
+      const row = document.createElement("div");
+      row.className = "row " + kind;
+      row.innerHTML = `<span class="k ${kind}">${LABEL[kind]}</span><span class="t">${esc(text)}</span>`;
+      logEl.appendChild(row); logEl.scrollTop = logEl.scrollHeight;
+      setState(st);
+      if (opt && opt.diff) showDiff(opt);
+      if (opt && "accept" in opt) decide(opt.accept);
+      if (opt && opt.model) $("model").textContent = opt.model;
+    }
+    fill.style.width = `${(idx / evs.length) * 100}%`;
+    $("clock").textContent = `${idx} / ${evs.length} events`;
+    const next = evs[idx];
+    const wait = !next ? 0 : next[0] === "review" && next[3] && "accept" in next[3] ? 2200 : kind === "user" ? 1700 : kind === "error" ? 1500 : next[0] === "term" ? 1200 : 750;
+    if (playing) timer = setTimeout(step, wait / speed);
+  }
+  function play() { if (idx >= TASKS[task].events.length) reset(); playing = true; $("play").textContent = "❚❚"; $("play").setAttribute("aria-label", "Pause"); clearTimeout(timer); timer = setTimeout(step, 200); }
+  function pause() { playing = false; clearTimeout(timer); $("play").textContent = "▶"; $("play").setAttribute("aria-label", "Play"); }
+  function reset() {
+    pause(); idx = 0; logEl.innerHTML = ""; fill.style.width = "0";
+    codeEl.innerHTML = '<div class="empty">The editor shows each proposed change here, as a diff.</div>';
+    termEl.innerHTML = '<span class="ps">PS C:\\flask-testbed&gt;</span>';
+    $("fname").textContent = TASKS[task].file; $("fbadge").hidden = true; $("model").textContent = TASKS[task].model;
+    setState(null); stateEl.className = "state"; $("stateText").textContent = "idle";
+    $("clock").textContent = `0 / ${TASKS[task].events.length} events`;
+    track.querySelectorAll(".tick").forEach((t) => t.remove());
+    const evs = TASKS[task].events;
+    const color = { review: "var(--amber2)", error: "var(--ember)", apply: "var(--green)", done: "var(--green)", term: "var(--blue)" };
+    evs.forEach((e, i) => { if (color[e[0]]) { const t = document.createElement("span"); t.className = "tick"; t.style.left = `${((i + 1) / evs.length) * 100}%`; t.style.background = color[e[0]]; track.appendChild(t); } });
+  }
+  function jump(to) { const was = playing; reset(); while (idx < to) { const p = playing; playing = false; step(); playing = p; } if (was) play(); }
+
+  $("play").onclick = () => (playing ? pause() : play());
+  $("restart").onclick = () => { reset(); play(); };
+  $("speed").onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $("speed").textContent = speed + "×"; };
+  track.onclick = (e) => { const r = track.getBoundingClientRect(); jump(Math.round(((e.clientX - r.left) / r.width) * TASKS[task].events.length)); };
+  document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+    task = b.dataset.task; reset(); play();
+  });
+  reset();
+  new IntersectionObserver((es) => { if (es[0].isIntersecting && !started) { started = true; if (reduce) jump(TASKS[task].events.length); else play(); } }, { threshold: .45 }).observe($("ide"));
+})();
+</script>
+</body>
+</html>

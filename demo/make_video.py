@@ -92,6 +92,12 @@ def build_segments():
         cuts.append((a, b, True))
         cursor = b
     cuts.append((cursor, min(t_end, total), False))
+    # Split cuts where a caption changes, so each section gets its own label.
+    split = []
+    for a, b, f in cuts:
+        edges = [a] + sorted(t for t, _ in marks if a < t < b) + [b]
+        split += [(x, y, f) for x, y in zip(edges, edges[1:]) if y - x > 0.2]
+    cuts = split
     # Short thinking stretches (under a minute, e.g. Task C's fallback) stay readable at 2x;
     # only the long ones absorb the rest of the time budget.
     SHORT, SHORT_SPEED = 60, 2.0

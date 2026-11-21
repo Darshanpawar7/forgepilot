@@ -16,3 +16,5 @@ docs/writeup.docx
 __pycache__/
 demo/voice/
 demo/*.wav
+demo/voice-take2/
+!docs/media/forgepilot-demo.mp4

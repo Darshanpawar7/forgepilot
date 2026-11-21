@@ -48,7 +48,7 @@ graph = ";".join(chains)
 graph += f";{''.join(labels)}amix=inputs={len(labels)}:normalize=0:duration=longest,asplit=2[voice][key]"
 graph += ";[1:a]volume=0.3[bed];[bed][key]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=600[ducked]"
 graph += ";[voice][ducked]amix=inputs=2:normalize=0:duration=first,loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
-graph += ";[0:v]" + ",".join(draws) + "[vout]"
+graph += ";[0:v]tpad=stop_mode=clone:stop_duration=3," + ",".join(draws) + "[vout]"  # hold the last frame 3 s
 
 limit = ["-t", sys.argv[3]] if len(sys.argv) > 3 else []
 cmd = ["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph, "-map", "[vout]", "-map", "[aout]",

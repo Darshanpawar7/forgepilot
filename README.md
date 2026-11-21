@@ -8,6 +8,8 @@ ForgePilot is a Visual Studio Code extension whose **agent loop runs on [TrueFor
 
 Built for the TrueFoundry Forge-a-thon (Techfest, IIT Bombay 2026-27) by team **FLOWSTATE**.
 
+**See it:** [project site with a replay of the recorded run](https://darshanpawar7.github.io/forgepilot/) · [demo video](https://darshanpawar7.github.io/forgepilot/#video) · [write-up (PDF)](docs/writeup.pdf)
+
 **Starting point:** written from scratch, with no fork. Dependencies are the official TrueForge SDK, the MCP TypeScript SDK and `diff` (jsdiff).
 
 ## What it does
