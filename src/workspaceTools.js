@@ -18,7 +18,9 @@ const TEXT_EXT = /\.(py|pyi|rst|md|txt|toml|cfg|ini|json|ya?ml|js|ts|html|css|sh
 function root() {
   const f = vscode.workspace.workspaceFolders;
   if (!f || !f.length) throw new Error("Open a folder in VS Code first.");
-  return f[0].uri.fsPath;
+  // VS Code reports Windows paths with a lower-case drive ("c:\..."). Commands run from there see
+  // __file__ and sys.path with "c:" while Python itself uses "C:", which breaks path-comparing tests.
+  return f[0].uri.fsPath.replace(/^([a-z]):/, (m, d) => d.toUpperCase() + ":");
 }
 
 function resolveInside(rel) {

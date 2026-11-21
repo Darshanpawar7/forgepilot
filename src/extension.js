@@ -17,8 +17,12 @@ const reviewUi = require("./review");
 
 // Provider overload and network blips are retried on the same model before falling back.
 const TRANSIENT_ERROR = /\b(429|500|502|503|504)\b|high demand|overloaded|timeout|timed out|ECONNRESET|Cannot connect/i;
-const MAX_ATTEMPTS_PER_MODEL = 3;
-const RETRY_DELAY_MS = 5000;
+const MAX_ATTEMPTS_PER_MODEL = 4;
+// Rate limits (429, quota) need a real back-off; overload and network errors clear faster.
+const RATE_LIMITED = /\b429\b|quota|rate.?limit/i;
+const RATE_LIMIT_DELAYS_MS = [20000, 40000, 60000];
+const OVERLOAD_DELAYS_MS = [5000, 10000, 20000];
+const CONTINUE_MESSAGE = "The previous step failed because of a temporary model provider error. Nothing you already did was lost. Continue the task from where you left off; do not repeat edits that were already applied.";
 
 let tools, client, panel, status, extensionRoot;
 let run = null; // { sessionId, cancelled }
@@ -222,13 +226,20 @@ async function consume(stream, st) {
   }
 }
 
-async function runWithModel(modelName, message) {
-  const session = await client.sessions.create({ agent: { spec: agentSpec(modelName) } });
-  const sessionId = (session.data && session.data.id) || session.id;
+// resumeSessionId: after a temporary provider error, continue in the same TrueForge session, so the
+// agent keeps everything it has already read and done instead of starting over.
+async function runWithModel(modelName, message, resumeSessionId) {
+  let sessionId = resumeSessionId;
+  if (!sessionId) {
+    const session = await client.sessions.create({ agent: { spec: agentSpec(modelName) } });
+    sessionId = (session.data && session.data.id) || session.id;
+    log("info", `TrueForge session ${sessionId} · model ${modelName} · open ${cfg("serverUrl")} to inspect it`);
+  } else {
+    log("info", `Continuing TrueForge session ${sessionId} with a new turn; the agent keeps its history.`);
+  }
   run.sessionId = sessionId;
-  log("info", `TrueForge session ${sessionId} · model ${modelName} · open ${cfg("serverUrl")} to inspect it`);
   const st = { calls: new Map(), pending: [], done: null, turnId: null, lastEventId: null };
-  await consume(await client.sessions.createTurnStream(sessionId, { input: [{ type: "user.message", content: message }] }), st);
+  await consume(await client.sessions.createTurnStream(sessionId, { input: [{ type: "user.message", content: resumeSessionId ? CONTINUE_MESSAGE : message }] }), st);
   while (!st.done && !run.cancelled && st.pending.length && st.turnId) {
     try { await fetchMissingCalls(sessionId, st); } catch (e) { log("error", `could not read tool calls: ${e.message}`); }
     const pending = st.pending.splice(0);
@@ -243,13 +254,13 @@ async function runWithModel(modelName, message) {
     }
     await consume(sub, st);
   }
-  return st.done || { status: run.cancelled ? "cancelled" : "error", message: "The turn ended without a result." };
+  return { ...(st.done || { status: run.cancelled ? "cancelled" : "error", message: "The turn ended without a result." }), sessionId };
 }
 
 async function startRun(request, { extra = "", label = "Agent", inline = false }) {
   if (run) { vscode.window.showWarningMessage("ForgePilot is already running. Cancel it first."); return; }
   openPanel();
-  run = { sessionId: null, cancelled: false, inline };
+  run = { sessionId: null, cancelled: false, inline, applied: 0 };
   panel.webview.postMessage({ type: "start", text: `${label}: ${request}` });
   setStatus("starting", true);
   try {
@@ -267,14 +278,19 @@ async function startRun(request, { extra = "", label = "Agent", inline = false }
       if (run.cancelled) break;
       setStatus(`running on ${models[i]}`, true);
       let result;
+      let resume = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
-        try { result = await runWithModel(models[i], message); }
-        catch (e) { result = { status: "error", message: e.message || String(e) }; }
+        try { result = await runWithModel(models[i], message, resume); }
+        catch (e) { result = { status: "error", message: e.message || String(e), sessionId: resume }; }
         const transient = result.status === "error" && TRANSIENT_ERROR.test(result.message || "");
         if (!transient || attempt === MAX_ATTEMPTS_PER_MODEL || run.cancelled) break;
+        const delays = RATE_LIMITED.test(result.message || "") ? RATE_LIMIT_DELAYS_MS : OVERLOAD_DELAYS_MS;
+        const wait = delays[Math.min(attempt - 1, delays.length - 1)];
+        resume = result.sessionId || null;
         log("error", `Model ${models[i]} is temporarily unavailable (${(result.message || "").slice(0, 100)}).`);
-        log("info", `Retrying ${models[i]} in ${RETRY_DELAY_MS / 1000}s (attempt ${attempt + 1} of ${MAX_ATTEMPTS_PER_MODEL}).`);
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        log("info", `Waiting ${wait / 1000}s, then continuing on ${models[i]} (attempt ${attempt + 1} of ${MAX_ATTEMPTS_PER_MODEL}).`);
+        setStatus(`waiting ${wait / 1000}s for ${models[i]}`, true);
+        await new Promise((r) => setTimeout(r, wait));
       }
       if (result.rejected) { log("done", "You rejected the change, so nothing was written. Your files are unchanged."); break; }
       if (result.status === "done") { log("done", "Done. Review the changes in the editor; use “ForgePilot: Undo Last Applied Change” to revert."); break; }
@@ -282,10 +298,10 @@ async function startRun(request, { extra = "", label = "Agent", inline = false }
       const msg = result.message || "unknown error";
       if (i < models.length - 1) {
         log("error", `Model ${models[i]} failed: ${msg}`);
-        log("info", `Falling back to ${models[i + 1]} automatically. Your files were not changed.`);
+        log("info", `Falling back to ${models[i + 1]} automatically. ${run.applied ? `The ${run.applied} change(s) you already accepted stay in place (Undo reverts them).` : "Your files were not changed."}`);
         vscode.window.showWarningMessage(`ForgePilot: ${models[i]} failed (${msg.slice(0, 120)}). Falling back to ${models[i + 1]}.`);
       } else {
-        log("error", `All configured models failed. Last error: ${msg}. Your files were not changed.`);
+        log("error", `All configured models failed. Last error: ${msg}. ${run.applied ? `${run.applied} accepted change(s) were applied before the failure; Undo reverts them.` : "Your files were not changed."}`);
         vscode.window.showErrorMessage(`ForgePilot: the model is unavailable (${msg.slice(0, 160)}). Your files were not changed.`);
       }
     }
@@ -346,7 +362,7 @@ async function activate(context) {
   status.command = "forgepilot.openAgent";
   status.show();
   setStatus("idle", false);
-  tools = new WorkspaceTools(log, { onApply: (file, before, after, isCreate) => undoStack.push({ file, before, after, isCreate }) });
+  tools = new WorkspaceTools(log, { onApply: (file, before, after, isCreate) => { undoStack.push({ file, before, after, isCreate }); if (run) run.applied++; } });
   try { await tools.start(cfg("mcpPort")); }
   catch (e) { vscode.window.showErrorMessage(`ForgePilot could not start its MCP server on port ${cfg("mcpPort")}: ${e.message}`); }
   context.subscriptions.push(
